@@ -1,0 +1,5 @@
+flake8
+black
+aiohttp
+aiohttp_jinja2
+aiohttp_session[secure]

@@ -1,0 +1,8 @@
+name: cenv
+channels:
+  - defaults
+dependencies:
+  - pip
+  - requests
+  - pip:
+    - -r requirements.txt
