@@ -88,7 +88,16 @@ async def login(request: web.Request) -> web.Response:
         response_type="code",
         redirect_uri=redirect_uri(request),
         state=state,
-        scope="streaming,user-read-email,user-read-private",
+        scope=",".join(
+            [
+                "streaming",
+                "user-read-email",
+                "user-read-private",
+                "user-modify-playback-state",
+                "user-read-playback-state",
+                "user-read-currently-playing",
+            ]
+        ),
     )
 
     return web.HTTPTemporaryRedirect(location=str(location))
