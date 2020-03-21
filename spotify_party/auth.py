@@ -3,7 +3,6 @@ __all__ = ["setup", "require"]
 import os
 import time
 import secrets
-from functools import wraps
 from typing import Union
 
 import yarl
@@ -13,6 +12,21 @@ from aiohttp import web, ClientSession
 
 SPOTIFY_CLIENT_ID = os.environ["SPOTIFY_CLIENT_ID"]
 SPOTIFY_CLIENT_SECRET = os.environ["SPOTIFY_CLIENT_SECRET"]
+
+
+async def get_token(request: web.Request) -> Union[str, None]:
+    session = await aiohttp_session.get_session(request)
+
+    access_token = session.get("access_token", None)
+    refresh_token = session.get("refresh_token", None)
+    if not access_token or not refresh_token:
+        return None
+
+    current_time = time.time()
+    if session.get("expires_at", current_time) - current_time <= 60:
+        access_token = await handle_code(session, request, refresh_token)
+
+    return access_token
 
 
 def redirect_uri(request: web.Request) -> str:
@@ -31,9 +45,9 @@ async def handle_error(request: web.Request, error: str) -> web.Response:
     )
 
 
-async def handle_code(request: web.Request, code: str) -> str:
-    session = await aiohttp_session.get_session(request)
-
+async def handle_code(
+    session: aiohttp_session.Session, request: web.Request, code: str
+) -> str:
     params = dict(headers={"Accept": "application/json"})
     params["data"] = dict(
         client_id=SPOTIFY_CLIENT_ID,
@@ -56,7 +70,7 @@ async def handle_code(request: web.Request, code: str) -> str:
     return token
 
 
-async def auth(request: web.Request) -> web.Response:
+async def login(request: web.Request) -> web.Response:
     session = await aiohttp_session.get_session(request)
 
     # Get the current redirect URL
@@ -80,6 +94,19 @@ async def auth(request: web.Request) -> web.Response:
     return web.HTTPTemporaryRedirect(location=str(location))
 
 
+async def logout(request: web.Request) -> web.Response:
+    session = await aiohttp_session.get_session(request)
+
+    if "access_token" in session:
+        del session["access_token"]
+    if "refresh_token" in session:
+        del session["refresh_token"]
+    if "expires_at" in session:
+        del session["expires_at"]
+
+    return web.Response(body="logged out")
+
+
 async def callback(request: web.Request) -> web.Response:
     session = await aiohttp_session.get_session(request)
 
@@ -93,7 +120,7 @@ async def callback(request: web.Request) -> web.Response:
             request, request.query.get("error", "unknown error")
         )
 
-    await handle_code(request, request.query["code"])
+    await handle_code(session, request, request.query["code"])
 
     return web.HTTPTemporaryRedirect(
         location=session.get("redirect", default_redirect(request))
@@ -101,22 +128,11 @@ async def callback(request: web.Request) -> web.Response:
 
 
 async def token(request: web.Request) -> web.Response:
-    session = await aiohttp_session.get_session(request)
-
-    auth_url = str(request.app.router["auth"].url_for())
-
-    if "access_token" not in session or "refresh_token" not in session:
-        return web.HTTPTemporaryRedirect(location=auth_url)
-
-    current_time = time.time()
-    if session.get("expires_at", current_time) - current_time <= 60:
-        try:
-            token = await handle_code(request, session["refresh_token"])
-        except Exception:
-            return web.HTTPTemporaryRedirect(location=auth_url)
-    else:
-        token = session["access_token"]
-
+    token = await get_token(request)
+    if token is None:
+        return web.HTTPTemporaryRedirect(
+            location=str(request.app.router["login"].url_for())
+        )
     return web.json_response(dict(token=token))
 
 
@@ -124,7 +140,8 @@ def setup(app: web.Application) -> None:
     # Add the routes
     app.add_routes(
         [
-            web.get("/spotify/auth", auth, name="auth"),
+            web.get("/spotify/login", login, name="login"),
+            web.get("/spotify/logout", logout, name="logout"),
             web.get("/spotify/callback", callback, name="callback"),
             web.get("/spotify/token", token, name="token"),
         ]
@@ -132,13 +149,8 @@ def setup(app: web.Application) -> None:
 
 
 async def require(request: web.Request) -> None:
-    session = await aiohttp_session.get_session(request)
-
-    auth_url = str(request.app.router["auth"].url_for())
-
-    if "access_token" not in session or "refresh_token" not in session:
-        raise web.HTTPTemporaryRedirect(location=auth_url)
-
-    current_time = time.time()
-    if session.get("expires_at", current_time) - current_time <= 60:
-        await handle_code(request, session["refresh_token"])
+    token = await get_token(request)
+    if token is None:
+        raise web.HTTPTemporaryRedirect(
+            location=str(request.app.router["login"].url_for())
+        )

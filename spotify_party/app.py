@@ -10,12 +10,15 @@ from aiohttp_session.cookie_storage import EncryptedCookieStorage
 import jinja2
 import aiohttp_jinja2
 
-from . import auth
+from . import auth, api
 
 
 @aiohttp_jinja2.template("index.html")
 async def index(request: web.Request) -> web.Response:
     await auth.require(request)
+
+    print(await api.request(request, "/me"))
+
     return {}
 
 
@@ -28,11 +31,14 @@ def app_factory() -> web.Application:
 
     # Set up the templating engine
     aiohttp_jinja2.setup(app, loader=jinja2.FileSystemLoader("./templates"))
+    app["static_root_url"] = "/static"
 
     # Set up the authentication subapp
     auth.setup(app)
 
     # And the routes for the main app
-    app.add_routes([web.get("/", index, name="index")])
+    app.add_routes(
+        [web.get("/", index, name="index"), web.static("/static", "./static")]
+    )
 
     return app
