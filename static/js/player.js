@@ -1,20 +1,24 @@
 "use strict";
 
 window.onSpotifyWebPlaybackSDKReady = () => {
+  let connecting = false;
   let connection = null;
   let current_track = null;
+  let this_device_id = null;
 
-  const disconnect = () => {
+  const disconnectSocket = () => {
+    if (connection) connection.close();
     connection = null;
+    connecting = false;
   };
 
-  const connect = () => {
-    disconnect();
+  const connectSocket = () => {
+    disconnectSocket();
     connection = new WebSocket(SOCKET_URL);
 
     connection.onopen = () => console.log("open ws");
     connection.onclose = () => {
-      disconnect();
+      // disconnectSocket();
       console.log("close ws");
     };
     connection.onmessage = event => {
@@ -23,7 +27,7 @@ window.onSpotifyWebPlaybackSDKReady = () => {
     };
   };
 
-  const get_spotify_token = async callback => {
+  const getSpotifyToken = async callback => {
     await fetch(TOKEN_URL, {
       method: "POST",
       headers: {
@@ -37,15 +41,15 @@ window.onSpotifyWebPlaybackSDKReady = () => {
       .catch(error => console.log(`Something went wrong: ${error}`));
   };
 
-  const player = new Spotify.Player({
-    name: "Spotify Party",
-    getOAuthToken: get_spotify_token
-  });
+  const disconnect = () => {
+    player.pause();
+    disconnectSocket();
+  };
 
-  player.addListener("ready", ({ device_id }) => {
-    // When ready, transfer playback to this device
-    const this_device_id = device_id;
-    get_spotify_token(token => {
+  const connect = callback => {
+    connecting = true;
+    if (!callback) callback = () => {};
+    getSpotifyToken(token => {
       fetch("https://api.spotify.com/v1/me/player", {
         method: "PUT",
         headers: {
@@ -54,16 +58,34 @@ window.onSpotifyWebPlaybackSDKReady = () => {
         },
         body: JSON.stringify({ device_ids: [this_device_id] })
       })
-        .then(() => connect())
+        .then(() => connectSocket())
+        .then(() => (connecting = false))
+        .then(callback)
         .catch(console.log);
     });
+  };
+
+  const player = new Spotify.Player({
+    name: "Spotify Party",
+    getOAuthToken: getSpotifyToken
+  });
+
+  player.addListener("ready", ({ device_id }) => {
+    // When ready, transfer playback to this device
+    this_device_id = device_id;
+    connect();
   });
 
   // Listen for changes in playback status
   player.addListener("player_state_changed", state => {
     console.log(state);
-    if (IS_HOST && connection) {
-      if (state.paused) return;
+    // If the user paused or
+    if (IS_HOST && connection && connection.readyState == 1) {
+      if (state.paused) {
+        current_track = null;
+        connection.send(JSON.stringify({ action: "pause" }));
+        return;
+      }
       if (!state.track_window || !state.track_window.current_track) return;
       const track = state.track_window.current_track;
       if (track.uri != current_track) {

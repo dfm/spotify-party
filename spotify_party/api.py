@@ -39,14 +39,16 @@ async def get_token(
     if user.expires_at - current_time <= 60:
         auth_info = await refresh_token(request, session, user.refresh_token)
         user.access_token = auth_info["access_token"]
-        user.refresh_token = auth_info["refresh_token"]
         user.expires_at = auth_info["expires_at"]
 
     return user.access_token
 
 
 async def refresh_token(
-    request: web.Request, session: aiohttp_session.Session, code: str
+    request: web.Request,
+    session: aiohttp_session.Session,
+    code: str,
+    first: bool = False,
 ) -> Dict[str, Any]:
     """Refresh the authorization with a refresh_token
 
@@ -62,7 +64,7 @@ async def refresh_token(
     params["data"] = dict(
         client_id=request.config_dict["config"]["spotify_client_id"],
         client_secret=request.config_dict["config"]["spotify_client_secret"],
-        grant_type="authorization_code",
+        grant_type="authorization_code" if first else "refresh_token",
         code=code,
         redirect_uri=get_redirect_uri(request),
     )
@@ -72,9 +74,10 @@ async def refresh_token(
     ) as response:
         response = await response.json()
 
+    print(response)
     return dict(
         access_token=response["access_token"],
-        refresh_token=response["refresh_token"],
+        refresh_token=response.get("refresh_token", None),
         expires_at=time.time() + int(response["expires_in"]),
     )
 

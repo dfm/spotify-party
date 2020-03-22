@@ -1,3 +1,4 @@
 environment.lock
 secrets.sh
 config
+.mypy_cache

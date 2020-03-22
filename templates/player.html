@@ -1,20 +1,9 @@
-<!DOCTYPE html>
-<html>
-  <head>
-    <title>Spotify Party</title>
-  </head>
-  <body>
-    <h1>Spotify Party</h1>
-    <h2>
-      Open your console log: <code>View > Developer > JavaScript Console</code>
-    </h2>
-
-    <script>
-      const TOKEN_URL = "{{ url('token') }}";
-      const SOCKET_URL = "{{ socket_url }}";
-      const IS_HOST = "{{ is_host }}";
-    </script>
-    <script src="https://sdk.scdn.co/spotify-player.js"></script>
-    <script src="{{ static('js/player.js') }}"></script>
-  </body>
-</html>
+{% extends "layout.html" %} {% block scripts %}
+<script src="https://sdk.scdn.co/spotify-player.js"></script>
+<script>
+  const TOKEN_URL = "{{ url('token') }}";
+  const SOCKET_URL = "{{ socket_url }}";
+  const IS_HOST = "{{ is_host }}";
+</script>
+<script src="{{ static('js/player.js') }}"></script>
+{% endblock %}

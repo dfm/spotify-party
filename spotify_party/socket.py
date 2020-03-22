@@ -5,9 +5,11 @@ from aiohttp import web, WSMsgType
 from . import player, api
 
 
-async def socket(request: web.Request) -> web.Response:
+async def socket(request: web.Request) -> web.WebSocketResponse:
     # Get the current user's info
     user = await player.get_current_user(request)
+    room = request.app["db"].get_player(user.playing_to)
+    is_host = room is not None
 
     # Make sure that we're getting a websockets request
     ws_current = web.WebSocketResponse()
@@ -35,22 +37,32 @@ async def socket(request: web.Request) -> web.Response:
 
         elif message.type == WSMsgType.text:
             payload = message.json()
-            uri = payload.get("uri", None)
-            if uri is not None and payload.get("action", None) == "new_track":
-                room = request.app["db"].get_player(user.playing_to)
-                if not room:
-                    continue
-                for listener in room.listeners:
-                    response = await api.call_api(
-                        request,
-                        "/me/player/play",
-                        method="PUT",
-                        json=dict(uris=[uri]),
-                        user_id=listener,
-                    )
-                    print(response)
+            action = payload.get("action", None)
+
+            if is_host:
+                uri = payload.get("uri", None)
+                if uri is not None and action == "new_track":
+                    for listener in room.listeners:
+                        await api.call_api(
+                            request,
+                            "/me/player/play",
+                            method="PUT",
+                            json=dict(uris=[uri]),
+                            user_id=listener,
+                        )
+
+                elif action == "pause":
+                    for listener in room.listeners:
+                        await api.call_api(
+                            request,
+                            "/me/player/pause",
+                            method="PUT",
+                            user_id=listener,
+                        )
 
     del request.app["websockets"][user.user_id]
+
+    # FIXME : Need to remove from listeners here too
 
     return ws_current
 

@@ -17,7 +17,7 @@ def get_default_redirect(request: web.Request) -> str:
 async def handle_error(request: web.Request, error: str) -> web.Response:
     """Deal with errors in the authorization flow"""
     raise web.HTTPInternalServerError(
-        text="Unhandled OAuth2 Error: {0}".format()
+        text="Unhandled OAuth2 Error: {0}".format(error)
     )
 
 
@@ -73,13 +73,11 @@ async def callback(request: web.Request) -> web.Response:
 
     # The request didn't go through or the user blocked the request
     if "error" in request.query:
-        return handle_error(
-            request, request.query.get("error", "unknown error")
-        )
+        handle_error(request, request.query.get("error", "unknown error"))
 
     # Get the actual tokens
     auth_info = await api.refresh_token(
-        request, session, request.query["code"]
+        request, session, request.query["code"], first=True
     )
 
     # Get the user's Spotify info

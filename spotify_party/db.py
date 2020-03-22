@@ -5,7 +5,7 @@ __all__ = [
 ]
 
 import secrets
-from typing import Union
+from typing import Union, Set
 
 
 class User:
@@ -22,8 +22,8 @@ class User:
         self.access_token = access_token
         self.refresh_token = refresh_token
         self.expires_at = expires_at
-        self.listening_to = None
-        self.playing_to = None
+        self.listening_to: Union[str, None] = None
+        self.playing_to: Union[str, None] = None
         self.socket = None
 
 
@@ -32,7 +32,7 @@ class Player:
         owner.playing_to = player_id
         self.player_id = player_id
         self.owner_id = owner.user_id
-        self.listeners = set()
+        self.listeners: Set[str] = set()
 
 
 class Database:
@@ -80,8 +80,8 @@ class Database:
         player = self.get_player(user.playing_to)
         if player is not None:
             for listener in list(player.listeners):
-                self.stop_listening(listener.user_id)
-        self.players.pop(player.player_id)
+                self.stop_listening(listener)
+            self.players.pop(player.player_id)
         user.playing_to = None
 
     def listen_to(self, user_id: str, player_id: str) -> None:

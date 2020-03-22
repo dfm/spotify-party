@@ -106,13 +106,12 @@ async def sync(request: web.Request) -> web.Response:
     if position_ms is None:
         position_ms = 0
     if uri is not None and play_info.get("is_playing", False):
-        response = await api.call_api(
+        await api.call_api(
             request,
             "/me/player/play",
             method="PUT",
             json=dict(uris=[uri], position_ms=position_ms),
         )
-        print(response)
 
     return web.json_response(play_info)
 
