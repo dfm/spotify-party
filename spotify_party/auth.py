@@ -1,4 +1,4 @@
-__all__ = ["setup", "require_auth"]
+__all__ = ["setup"]
 
 import secrets
 
@@ -57,7 +57,7 @@ async def login(request: web.Request) -> web.Response:
 
 async def logout(request: web.Request) -> web.Response:
     """Clear the login info and log out"""
-    await api.clear_token()
+    await api.clear_token(request)
     return web.Response(body="logged out")
 
 
@@ -66,7 +66,7 @@ async def callback(request: web.Request) -> web.Response:
     session = await aiohttp_session.get_session(request)
 
     # Check that the 'state' matches
-    state = session.get("state", None)
+    state = session.pop("state", None)
     returned_state = request.query.get("state", None)
     if None in (state, returned_state) or state != returned_state:
         raise web.HTTPBadRequest()
@@ -78,10 +78,22 @@ async def callback(request: web.Request) -> web.Response:
         )
 
     # Get the actual tokens
-    await api.refresh_token(request, session, request.query["code"])
+    auth_info = await api.refresh_token(
+        request, session, request.query["code"]
+    )
 
     # Get the user's Spotify info
-    session["sp_user_info"] = await api.call_api(request, "/me")
+    user_info = await api.call_api(
+        request, "/me", token=auth_info["access_token"]
+    )
+    user = request.app["db"].add_user(
+        user_info["id"],
+        user_info["display_name"],
+        auth_info["access_token"],
+        auth_info["refresh_token"],
+        auth_info["expires_at"],
+    )
+    session["sp_user_id"] = user.user_id
 
     return web.HTTPTemporaryRedirect(
         location=session.get("redirect", get_default_redirect(request))
@@ -97,12 +109,3 @@ def setup(app: web.Application) -> None:
             web.get("/spotify/callback", callback, name="callback"),
         ]
     )
-
-
-async def require_auth(request: web.Request) -> None:
-    try:
-        await api.get_token(request)
-    except web.HTTPUnauthorized:
-        raise web.HTTPTemporaryRedirect(
-            location=str(request.app.router["login"].url_for())
-        )

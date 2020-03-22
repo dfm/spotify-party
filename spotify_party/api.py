@@ -2,9 +2,11 @@ __all__ = [
     "call_api",
     "get_token",
     "refresh_token",
+    "require_auth",
 ]
 
 import time
+from typing import Any, Dict, Union
 
 import asyncio
 import aiohttp_session
@@ -18,26 +20,34 @@ def get_redirect_uri(request: web.Request) -> str:
     )
 
 
-async def get_token(request: web.Request) -> str:
+async def get_token(
+    request: web.Request, user_id: Union[str, None] = None
+) -> str:
     """Get an authorization token for the user, refresh if needed"""
     session = await aiohttp_session.get_session(request)
 
-    auth_info = session.get("sp_auth_info", None)
-    if auth_info is None:
+    if user_id is None:
+        user_id = session.get("sp_user_id", None)
+        if user_id is None:
+            raise web.HTTPUnauthorized()
+
+    user = request.app["db"].get_user(user_id)
+    if user is None:
         raise web.HTTPUnauthorized()
 
     current_time = time.time()
-    if auth_info.get("expires_at", current_time) - current_time <= 60:
-        return await refresh_token(
-            request, session, auth_info["refresh_token"]
-        )
+    if user.expires_at - current_time <= 60:
+        auth_info = await refresh_token(request, session, user.refresh_token)
+        user.access_token = auth_info["access_token"]
+        user.refresh_token = auth_info["refresh_token"]
+        user.expires_at = auth_info["expires_at"]
 
-    return auth_info["access_token"]
+    return user.access_token
 
 
 async def refresh_token(
     request: web.Request, session: aiohttp_session.Session, code: str
-) -> str:
+) -> Dict[str, Any]:
     """Refresh the authorization with a refresh_token
 
     Args:
@@ -62,23 +72,39 @@ async def refresh_token(
     ) as response:
         response = await response.json()
 
-    token = response["access_token"]
-    session["sp_auth_info"] = dict(
-        access_token=token,
+    return dict(
+        access_token=response["access_token"],
         refresh_token=response["refresh_token"],
         expires_at=time.time() + int(response["expires_in"]),
     )
 
-    return token
-
 
 async def clear_token(request: web.Request) -> None:
     session = await aiohttp_session.get_session(request)
-    del session["sp_auth_info"]
+    session.pop("sp_user_id", None)
+
+
+async def require_auth(request: web.Request) -> None:
+    """Helper for routes that require authorization"""
+    try:
+        await get_token(request)
+    except web.HTTPUnauthorized:
+        raise web.HTTPTemporaryRedirect(
+            location=str(
+                request.app.router["login"]
+                .url_for()
+                .with_query(dict(redirect=request.url.path))
+            )
+        )
 
 
 async def call_api(
-    request: web.Request, path: str, method: str = "GET", **params
+    request: web.Request,
+    path: str,
+    method: str = "GET",
+    token: Union[str, None] = None,
+    user_id: Union[str, None] = None,
+    **params
 ) -> dict:
     """Call the Spotify API
 
@@ -90,9 +116,10 @@ async def call_api(
         method [str]: The request method
 
     """
-    token = await get_token(request)
     if token is None:
-        return None
+        token = await get_token(request, user_id=user_id)
+        if token is None:
+            raise web.HTTPUnauthorized()
 
     data = dict(
         headers={
@@ -108,6 +135,11 @@ async def call_api(
         # We've been rate limited!
         if response.status == 429:
             await asyncio.sleep(int(response.headers["Retry-After"]))
-            return await call_api(request, path, method, **params)
+            return await call_api(
+                request, path, method, token=token, user_id=user_id, **params
+            )
+
+        if response.status == 204:
+            return {}
 
         return await response.json()

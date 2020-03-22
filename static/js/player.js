@@ -1,17 +1,77 @@
 "use strict";
 
 window.onSpotifyWebPlaybackSDKReady = () => {
+  let connection = null;
+  let current_track = null;
+
+  const disconnect = () => {
+    connection = null;
+  };
+
+  const connect = () => {
+    disconnect();
+    connection = new WebSocket(SOCKET_URL);
+
+    connection.onopen = () => console.log("open ws");
+    connection.onclose = () => {
+      disconnect();
+      console.log("close ws");
+    };
+    connection.onmessage = event => {
+      const data = JSON.parse(event.data);
+      console.log("message:", data);
+    };
+  };
+
+  const get_spotify_token = async callback => {
+    await fetch(TOKEN_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      }
+    })
+      .then(response => response.json())
+      .then(data => {
+        callback(data.token);
+      })
+      .catch(error => console.log(`Something went wrong: ${error}`));
+  };
+
   const player = new Spotify.Player({
     name: "Spotify Party",
-    getOAuthToken: async cb => {
-      await fetch(TOKEN_URL, {
+    getOAuthToken: get_spotify_token
+  });
+
+  player.addListener("ready", ({ device_id }) => {
+    // When ready, transfer playback to this device
+    const this_device_id = device_id;
+    get_spotify_token(token => {
+      fetch("https://api.spotify.com/v1/me/player", {
+        method: "PUT",
         headers: {
-          "Content-Type": "application/json"
-        }
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({ device_ids: [this_device_id] })
       })
-        .then(response => response.json())
-        .then(data => cb(data.token))
-        .catch(error => console.log(`Something went wrong: {error}`));
+        .then(() => connect())
+        .catch(console.log);
+    });
+  });
+
+  // Listen for changes in playback status
+  player.addListener("player_state_changed", state => {
+    console.log(state);
+    if (IS_HOST && connection) {
+      if (state.paused) return;
+      if (!state.track_window || !state.track_window.current_track) return;
+      const track = state.track_window.current_track;
+      if (track.uri != current_track) {
+        connection.send(
+          JSON.stringify({ action: "new_track", uri: track.uri })
+        );
+        current_track = track.uri;
+      }
     }
   });
 
@@ -27,16 +87,6 @@ window.onSpotifyWebPlaybackSDKReady = () => {
   });
   player.addListener("playback_error", ({ message }) => {
     console.error(message);
-  });
-
-  // Playback status updates
-  player.addListener("player_state_changed", state => {
-    console.log(state);
-  });
-
-  // Ready
-  player.addListener("ready", ({ device_id }) => {
-    console.log("Ready with Device ID", device_id);
   });
 
   // Not Ready
