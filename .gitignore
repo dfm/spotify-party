@@ -1,4 +1,5 @@
 environment.lock
-secrets.sh
 config
 .mypy_cache
+environment.yml
+venv

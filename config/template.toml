@@ -1,0 +1,4 @@
+spotify_client_id = "YOUR CLIENT ID"
+spotify_client_secret = "YOUR CLIENT SECRET"
+spotify_redirect_uri = "YOUR CALLBACK URI"
+port = 5000

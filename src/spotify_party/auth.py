@@ -77,7 +77,7 @@ async def callback(request: web.Request) -> web.Response:
 
     # Get the actual tokens
     auth_info = await api.refresh_token(
-        request, session, request.query["code"], first=True
+        request, session, code=request.query["code"],
     )
 
     # Get the user's Spotify info

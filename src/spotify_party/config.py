@@ -1,11 +1,14 @@
 __all__ = ["get_config"]
 
-import json
-from typing import Any, Dict
+import toml
+from typing import Any, Mapping, MutableMapping
 
 
 schema = dict(
-    spotify_client_id=(str, None), spotify_client_secret=(str, None),
+    spotify_client_id=(str, None),
+    spotify_client_secret=(str, None),
+    spotify_redirect_uri=(str, None),
+    port=(int, 5000),
 )
 
 
@@ -13,7 +16,7 @@ class ValidationError(Exception):
     pass
 
 
-def validate_config(config: Dict[str, Any]) -> Dict[str, Any]:
+def validate_config(config: MutableMapping[str, Any]) -> Mapping[str, Any]:
     new_config = dict()
     for name, (converter, default) in schema.items():
         value = config.pop(name, default)
@@ -33,7 +36,5 @@ def validate_config(config: Dict[str, Any]) -> Dict[str, Any]:
     return new_config
 
 
-def get_config(filename: str) -> Dict[str, Any]:
-    with open(filename, "r") as f:
-        config = json.load(f)
-    return validate_config(config)
+def get_config(filename: str) -> Mapping[str, Any]:
+    return validate_config(toml.load(filename))

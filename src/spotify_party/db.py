@@ -7,28 +7,21 @@ __all__ = [
 import secrets
 from typing import Union, Set
 
+from aiohttp_spotify import SpotifyAuth
+
 
 class User:
-    def __init__(
-        self,
-        user_id: str,
-        display_name: str,
-        access_token: str,
-        refresh_token: str,
-        expires_at: float,
-    ) -> None:
+    def __init__(self, user_id: str, display_name: str, auth: SpotifyAuth):
         self.user_id = user_id
         self.display_name = display_name
-        self.access_token = access_token
-        self.refresh_token = refresh_token
-        self.expires_at = expires_at
+        self.auth = auth
         self.listening_to: Union[str, None] = None
         self.playing_to: Union[str, None] = None
         self.socket = None
 
 
 class Player:
-    def __init__(self, player_id: str, owner: User) -> None:
+    def __init__(self, player_id: str, owner: User):
         owner.playing_to = player_id
         self.player_id = player_id
         self.owner_id = owner.user_id
@@ -39,6 +32,12 @@ class Database:
     def __init__(self):
         self.users = dict()
         self.players = dict()
+
+    def update_auth(self, user_id: str, auth: SpotifyAuth) -> None:
+        user = self.get_user(user_id)
+        if user is None:
+            raise KeyError(user_id)
+        user.auth = auth
 
     def add_user(self, *args, **kwargs) -> User:
         user = User(*args, **kwargs)

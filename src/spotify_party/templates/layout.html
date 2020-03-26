@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>{%- block title -%}Spotify Party{%- endblock -%}</title>
+
+    <link
+      rel="stylesheet"
+      href="https://stackpath.bootstrapcdn.com/bootstrap/4.4.1/css/bootstrap.min.css"
+      integrity="sha384-Vkoo8x4CGsO3+Hhxv8T/Q5PaXtkKtu6ug5TOeNV6gBiFeWPGFN9MuhOf23Q9Ifjh"
+      crossorigin="anonymous"
+    />
+    <link rel="stylesheet" href="{{ static('css/base.css') }}" />
+
+    {% block extrahead %}{% endblock %}
+  </head>
+  <body class="text-center">
+    <div class="cover-container d-flex w-100 h-100 p-3 mx-auto flex-column">
+      <header class="masthead mb-auto"></header>
+
+      <main role="main" class="inner cover">
+        {% block body %}
+        <h1 class="cover-heading">Listen.</h1>
+        <p class="lead">
+          To music with your friends even when you can't be together.
+        </p>
+        <p class="lead">
+          {% if logged_in %}
+          <a href="" class="btn btn-lg btn-secondary">Start sharing</a>
+          {% else %}
+          <a href="" class="btn btn-lg btn-secondary">Log in with Spotify</a>
+          {% endif %}
+        </p>
+        {% endblock %}
+      </main>
+
+      <footer class="mastfoot mt-auto">
+        <div class="inner">
+          <p>
+            An
+            <a href="https://github.com/dfm/spotify-party"
+              >open source project</a
+            >
+            by <a href="https://dfm.io">Dan F-M</a>.
+          </p>
+        </div>
+      </footer>
+    </div>
+
+    {% block scripts %}{% endblock %}
+  </body>
+</html>
