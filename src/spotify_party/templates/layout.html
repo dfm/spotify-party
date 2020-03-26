@@ -14,24 +14,23 @@
     {% block extrahead %}{% endblock %}
   </head>
   <body class="text-center">
-    <div class="cover-container d-flex w-100 h-100 p-3 mx-auto flex-column">
-      <header class="masthead mb-auto"></header>
+    <div class="d-flex w-100 h-100 p-3 mx-auto flex-column">
+      <header class="masthead mb-auto">
+        <div class="inner">
+          <nav class="nav nav-masthead justify-content-center">
+            <a class="nav-link" href="{{ url('about') }}">About</a>
+            {% if is_logged_in %}
+            <a class="nav-link" href="{{ url('logout') }}">Log out</a>
+            {% else %}
+            <a class="nav-link" href="{{ url('login') }}"
+              >Log in with Spotify</a
+            >
+            {% endif %}
+          </nav>
+        </div>
+      </header>
 
-      <main role="main" class="inner cover">
-        {% block body %}
-        <h1 class="cover-heading">Listen.</h1>
-        <p class="lead">
-          To music with your friends even when you can't be together.
-        </p>
-        <p class="lead">
-          {% if logged_in %}
-          <a href="" class="btn btn-lg btn-secondary">Start sharing</a>
-          {% else %}
-          <a href="" class="btn btn-lg btn-secondary">Log in with Spotify</a>
-          {% endif %}
-        </p>
-        {% endblock %}
-      </main>
+      {% block body %} {% endblock %}
 
       <footer class="mastfoot mt-auto">
         <div class="inner">
@@ -46,6 +45,7 @@
       </footer>
     </div>
 
+    <!--  -->
     {% block scripts %}{% endblock %}
   </body>
 </html>

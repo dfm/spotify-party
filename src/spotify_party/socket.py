@@ -2,13 +2,13 @@ __all__ = ["setup"]
 
 from aiohttp import web, WSMsgType
 
-from . import player, api
+from . import api, db
 
 
-async def socket(request: web.Request) -> web.WebSocketResponse:
+@api.require_auth
+async def socket(request: web.Request, user: db.User) -> web.WebSocketResponse:
     # Get the current user's info
-    user = await player.get_current_user(request)
-    room = request.app["db"].get_player(user.playing_to)
+    room = request.app["db"].get_room(user.playing_to)
     is_host = room is not None
 
     # Make sure that we're getting a websockets request
@@ -45,16 +45,17 @@ async def socket(request: web.Request) -> web.WebSocketResponse:
                     for listener in room.listeners:
                         await api.call_api(
                             request,
+                            request.app["db"].get_user(listener),
                             "/me/player/play",
                             method="PUT",
                             json=dict(uris=[uri]),
-                            user_id=listener,
                         )
 
                 elif action == "pause":
                     for listener in room.listeners:
                         await api.call_api(
                             request,
+                            request.app["db"].get_user(listener),
                             "/me/player/pause",
                             method="PUT",
                             user_id=listener,

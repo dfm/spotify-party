@@ -1,7 +1,6 @@
 "use strict";
 
 window.onSpotifyWebPlaybackSDKReady = () => {
-  let connecting = false;
   let connection = null;
   let current_track = null;
   let this_device_id = null;
@@ -9,7 +8,6 @@ window.onSpotifyWebPlaybackSDKReady = () => {
   const disconnectSocket = () => {
     if (connection) connection.close();
     connection = null;
-    connecting = false;
   };
 
   const connectSocket = () => {
@@ -47,7 +45,6 @@ window.onSpotifyWebPlaybackSDKReady = () => {
   };
 
   const connect = callback => {
-    connecting = true;
     if (!callback) callback = () => {};
     getSpotifyToken(token => {
       fetch("https://api.spotify.com/v1/me/player", {
@@ -59,7 +56,6 @@ window.onSpotifyWebPlaybackSDKReady = () => {
         body: JSON.stringify({ device_ids: [this_device_id] })
       })
         .then(() => connectSocket())
-        .then(() => (connecting = false))
         .then(callback)
         .catch(console.log);
     });

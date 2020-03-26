@@ -1,18 +1,18 @@
-__all__ = ["require_auth", "handle_auth"]
+__all__ = ["require_auth", "handle_auth", "call_api"]
 
 from functools import wraps
 from typing import Callable, Awaitable
 
 import aiohttp_session
 from aiohttp import web
-from aiohttp_spotify import SpotifyAuth
+from aiohttp_spotify import SpotifyAuth, SpotifyResponse
 
 from . import db
 
 
 def require_auth(
-    handler: Callable[[web.Request, db.User], Awaitable[web.Response]]
-) -> Callable[[web.Request], Awaitable[web.Response]]:
+    handler: Callable[[web.Request, db.User], Awaitable]
+) -> Callable[[web.Request], Awaitable]:
     """A decorator requiring that the user is authenticated to see a view"""
 
     @wraps(handler)
@@ -48,3 +48,26 @@ async def handle_auth(request: web.Request, auth: SpotifyAuth) -> None:
 
     session = await aiohttp_session.get_session(request)
     session["sp_user_id"] = user.user_id
+
+
+async def call_api(
+    request: web.Request,
+    user: db.User,
+    endpoint: str,
+    *,
+    method: str = "GET",
+    **kwargs
+) -> SpotifyResponse:
+    response = await request.app["spotify_app"]["spotify_client"].request(
+        request.app["client_session"],
+        user.auth,
+        endpoint,
+        method=method,
+        **kwargs
+    )
+
+    # Update the authentication info if required
+    if response.auth_changed:
+        request.app["db"].update_auth(user.user_id, response.auth)
+
+    return response

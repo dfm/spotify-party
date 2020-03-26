@@ -14,7 +14,7 @@ import jinja2
 import aiohttp_jinja2
 import aiohttp_spotify
 
-from . import db, api, views
+from . import db, api, views, room, socket
 
 
 def get_resource_path(path: str) -> pathlib.Path:
@@ -76,9 +76,8 @@ def app_factory(config: Mapping[str, Any]) -> web.Application:
     app["spotify_app"]["main_app"] = app
     app.add_subapp("/spotify", app["spotify_app"])
 
-    # # Set up the apps
-    # auth.setup(app)
-    # player.setup(app)
-    # socket.setup(app)
+    # Set up the apps
+    room.setup(app)
+    socket.setup(app)
 
     return app

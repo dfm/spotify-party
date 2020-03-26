@@ -1,4 +1,14 @@
-{% extends "layout.html" %} {% block scripts %}
+{% extends "layout.html" %}
+<!--  -->
+{% block body %}
+<main role="main" class="inner cover">
+  <p class="lead">
+    <a href="#" class="btn btn-lg btn-secondary">Start broadcast</a>
+  </p>
+</main>
+{% endblock %}
+<!--  -->
+{% block scripts %}
 <script src="https://sdk.scdn.co/spotify-player.js"></script>
 <script>
   const TOKEN_URL = "{{ url('token') }}";
