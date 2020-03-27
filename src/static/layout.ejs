@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>{%- block title -%}Spotify Party{%- endblock -%}</title>
+
+    <link
+      rel="stylesheet"
+      href="https://stackpath.bootstrapcdn.com/bootstrap/4.4.1/css/bootstrap.min.css"
+      integrity="sha384-Vkoo8x4CGsO3+Hhxv8T/Q5PaXtkKtu6ug5TOeNV6gBiFeWPGFN9MuhOf23Q9Ifjh"
+      crossorigin="anonymous"
+    />
+    <link rel="stylesheet" href="{{ static('css/base.css') }}" />
+
+    <% for (var css in htmlWebpackPlugin.files.css) { %>
+    <link href="<%= htmlWebpackPlugin.files.css[css] %>" rel="stylesheet" />
+    <% } %> {% block extrahead %}{% endblock %}
+  </head>
+  <body class="text-center">
+    <div class="d-flex w-100 h-100 p-3 mx-auto flex-column">
+      <header class="masthead mb-auto">
+        <div class="inner">
+          <nav class="nav nav-masthead justify-content-center">
+            <a class="nav-link" href="{{ url('about') }}">About</a>
+            {% if is_logged_in %}
+            <a class="nav-link" href="{{ url('logout') }}">Log out</a>
+            {% else %}
+            <a class="nav-link" href="{{ url('login') }}"
+              >Log in with Spotify</a
+            >
+            {% endif %}
+          </nav>
+        </div>
+      </header>
+
+      {% block body %} {% endblock %}
+
+      <footer class="mastfoot mt-auto">
+        <div class="inner">
+          <p>
+            An
+            <a href="https://github.com/dfm/spotify-party"
+              >open source project</a
+            >
+            by <a href="https://dfm.io">Dan F-M</a>.
+          </p>
+        </div>
+      </footer>
+    </div>
+
+    <!--  -->
+    {% block scripts %} <% htmlWebpackPlugin.files.js.forEach(function(file) {
+    %>
+    <script src="<%= file %>" type="text/javascript"></script>
+    <% }) %> {% endblock %}
+    <!--  -->
+  </body>
+</html>

@@ -3,3 +3,8 @@ config
 .mypy_cache
 environment.yml
 venv
+node_modules
+*.pem
+src/spotify_party/assets
+*.lock
+*.log

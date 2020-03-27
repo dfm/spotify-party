@@ -18,6 +18,26 @@ Then install this package:
 venv/bin/python -m pip install -e .
 ```
 
+## Build the assets
+
+Install node and yarn:
+
+```
+# ...
+```
+
+Install the node environment:
+
+```
+yarn
+```
+
+Then build the assets:
+
+```
+yarn build
+```
+
 ## Run the development server
 
 Edit the configuration file (there is an example in `config/template.toml`) then run:
