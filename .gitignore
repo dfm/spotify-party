@@ -8,3 +8,4 @@ node_modules
 src/spotify_party/assets
 *.lock
 *.log
+*.db

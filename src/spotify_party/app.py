@@ -14,7 +14,7 @@ import jinja2
 import aiohttp_jinja2
 import aiohttp_spotify
 
-from . import db, api, views, room, socket
+from . import db, api, views, socket
 
 
 def get_resource_path(path: str) -> pathlib.Path:
@@ -40,8 +40,7 @@ def app_factory(config: Mapping[str, Any]) -> web.Application:
     app.cleanup_ctx.append(client_session)
 
     # Connect the database and set up a map of websockets
-    app["db"] = db.Database()
-    app["websockets"] = dict()
+    app["db"] = db.Database(config["database_filename"])
 
     # And the routes for the main app
     app.add_routes(views.routes)
@@ -63,7 +62,7 @@ def app_factory(config: Mapping[str, Any]) -> web.Application:
         client_secret=config["spotify_client_secret"],
         redirect_uri=config["spotify_redirect_uri"],
         handle_auth=api.handle_auth,
-        default_redirect=app.router["index"].url_for(),
+        default_redirect=app.router["play"].url_for(),
         scope=[
             "streaming",
             "user-read-email",
@@ -76,8 +75,7 @@ def app_factory(config: Mapping[str, Any]) -> web.Application:
     app["spotify_app"]["main_app"] = app
     app.add_subapp("/spotify", app["spotify_app"])
 
-    # Set up the apps
-    room.setup(app)
-    socket.setup(app)
+    # Connect the sockets app
+    socket.sio.attach(app)
 
     return app

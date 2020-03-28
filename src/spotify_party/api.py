@@ -1,7 +1,7 @@
 __all__ = ["require_auth", "handle_auth", "call_api"]
 
 from functools import wraps
-from typing import Callable, Awaitable
+from typing import Callable, Awaitable, Union
 
 import aiohttp_session
 from aiohttp import web
@@ -19,7 +19,7 @@ def require_auth(
     async def wrapped(request: web.Request) -> web.Response:
         session = await aiohttp_session.get_session(request)
         user_id = session.get("sp_user_id")
-        user = request.app["db"].get_user(user_id)
+        user = await request.app["db"].get_user(user_id)
         if user_id is None or user is None:
             raise web.HTTPTemporaryRedirect(
                 location=request.app["spotify_app"]
@@ -42,7 +42,7 @@ async def handle_auth(request: web.Request, auth: SpotifyAuth) -> None:
         raise web.HTTPInternalServerError()
 
     user_info = response.json()
-    user = main_app["db"].add_user(
+    user = await main_app["db"].add_user(
         user_info["id"], user_info["display_name"], response.auth
     )
 
@@ -52,12 +52,15 @@ async def handle_auth(request: web.Request, auth: SpotifyAuth) -> None:
 
 async def call_api(
     request: web.Request,
-    user: db.User,
+    user: Union[db.User, None],
     endpoint: str,
     *,
     method: str = "GET",
     **kwargs
-) -> SpotifyResponse:
+) -> Union[SpotifyResponse, None]:
+    if user is None:
+        return None
+
     response = await request.app["spotify_app"]["spotify_client"].request(
         request.app["client_session"],
         user.auth,
@@ -68,6 +71,6 @@ async def call_api(
 
     # Update the authentication info if required
     if response.auth_changed:
-        request.app["db"].update_auth(user.user_id, response.auth)
+        await request.app["db"].update_auth(user, response.auth)
 
     return response
