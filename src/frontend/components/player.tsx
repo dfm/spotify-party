@@ -7,10 +7,11 @@ import { StreamLink } from "./stream-link";
 
 export interface SpotifyPlayerProps {
   controller: Controller;
+  roomId?: string;
 }
 
 export interface SpotifyPlayerState {
-  isBroadcasting: boolean;
+  isPlaying: boolean;
   deviceId?: string;
   streamUrl?: string;
 }
@@ -31,7 +32,7 @@ export class SpotifyPlayer extends React.Component<
     this.currentTrack = null;
     this.isPaused = true;
     this.state = {
-      isBroadcasting: false,
+      isPlaying: false,
       streamUrl: null,
       deviceId: null
     };
@@ -50,23 +51,26 @@ export class SpotifyPlayer extends React.Component<
 
     player.addListener("player_state_changed", state => {
       console.log("player_state_changed", state);
-      if (!state && self.state.isBroadcasting) {
-        self.stop();
-        return;
-      }
 
-      const pos = state.position;
-      const uri = state.track_window?.current_track?.uri;
-      if (state.paused && !self.isPaused) {
-        self.isPaused = true;
-        self.props.controller.pause();
-      } else if (!state.paused && self.isPaused) {
-        self.isPaused = false;
-        self.currentTrack = uri;
-        self.props.controller.change(uri, pos);
-      } else if (!state.paused && self.currentTrack != uri) {
-        self.currentTrack = uri;
-        self.props.controller.change(uri);
+      if (self.state.isPlaying) {
+        if (!state) {
+          self.stop();
+          return;
+        }
+
+        const pos = state.position;
+        const uri = state.track_window?.current_track?.uri;
+        if (state.paused && !self.isPaused) {
+          self.isPaused = true;
+          self.props.controller.pause();
+        } else if (!state.paused && self.isPaused) {
+          self.isPaused = false;
+          self.currentTrack = uri;
+          self.props.controller.change(uri, pos);
+        } else if (!state.paused && self.currentTrack != uri) {
+          self.currentTrack = uri;
+          self.props.controller.change(uri);
+        }
       }
     });
 
@@ -99,7 +103,7 @@ export class SpotifyPlayer extends React.Component<
       (roomId: string, streamUrl: string) => {
         console.log("started broadcast");
         self.setState({
-          isBroadcasting: true,
+          isPlaying: true,
           streamUrl: streamUrl
         });
       }
@@ -111,15 +115,58 @@ export class SpotifyPlayer extends React.Component<
     const self = this;
     this.props.controller.close(() => {
       console.log("stopped broadcast");
-      self.setState({ isBroadcasting: false, streamUrl: null });
+      self.setState({ isPlaying: false, streamUrl: null });
     });
   }
 
+  play() {
+    console.log("starting to listen");
+    if (!this.state.deviceId) return;
+    const self = this;
+    this.props.controller.play(this.state.deviceId, this.props.roomId, () => {
+      console.log("started listening");
+      this.setState({ isPlaying: true });
+    });
+  }
+
+  pause() {
+    console.log("stopping listening");
+    const self = this;
+    this.props.controller.pause(() => {
+      console.log("stopped listening");
+      self.setState({ isPlaying: false });
+    });
+  }
+
+  sync() {
+    console.log("syncing");
+    this.props.controller.sync(this.state.deviceId);
+  }
+
   render() {
-    const text = this.state.isBroadcasting
-      ? "Stop broadcast"
-      : "Start broadcast";
-    const action = this.state.isBroadcasting
+    if (this.props.roomId) {
+      const text = this.state.isPlaying ? "Stop listening" : "Start listening";
+      const action = this.state.isPlaying
+        ? () => this.pause()
+        : () => this.play();
+
+      return (
+        <p className="lead">
+          <Button
+            text={text}
+            onClick={action}
+            enabled={this.state.deviceId ? true : false}
+          />
+          <Button
+            text="Sync"
+            onClick={() => this.sync()}
+            enabled={this.state.isPlaying ? true : false}
+          />
+        </p>
+      );
+    }
+    const text = this.state.isPlaying ? "Stop broadcast" : "Start broadcast";
+    const action = this.state.isPlaying
       ? () => this.stop()
       : () => this.start();
 
@@ -138,4 +185,15 @@ export class SpotifyPlayer extends React.Component<
 
 export const renderPlayer = (controller: Controller, div: Element) => {
   ReactDOM.render(<SpotifyPlayer controller={controller} />, div);
+};
+
+export const renderListener = (
+  controller: Controller,
+  div: Element,
+  roomId: string
+) => {
+  ReactDOM.render(
+    <SpotifyPlayer controller={controller} roomId={roomId} />,
+    div
+  );
 };

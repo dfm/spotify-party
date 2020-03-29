@@ -22,12 +22,6 @@ export class Controller {
       .catch(error => console.log(`couldn't get stream: ${error}`));
   }
 
-  pause(callback?: () => void) {
-    const req = fetch("/api/pause", { method: "PUT" });
-    if (callback) req.then(() => callback());
-    req.catch(error => console.log(`couldn't pause: ${error}`));
-  }
-
   close(callback?: () => void) {
     const req = fetch("/api/close", { method: "PUT" });
     if (callback) req.then(() => callback());
@@ -44,5 +38,35 @@ export class Controller {
     });
     if (callback) req.then(() => callback());
     req.catch(error => console.log(`couldn't change: ${error}`));
+  }
+
+  play(deviceId: string, roomId: string, callback?: () => void) {
+    const req = fetch("/api/play", {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({ device_id: deviceId, room_id: roomId })
+    });
+    if (callback) req.then(() => callback());
+    req.catch(error => console.log(`couldn't play: ${error}`));
+  }
+
+  pause(callback?: () => void) {
+    const req = fetch("/api/pause", { method: "PUT" });
+    if (callback) req.then(() => callback());
+    req.catch(error => console.log(`couldn't pause: ${error}`));
+  }
+
+  sync(deviceId: string, callback?: () => void) {
+    const req = fetch("/api/sync", {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({ device_id: deviceId })
+    });
+    if (callback) req.then(() => callback());
+    req.catch(error => console.log(`couldn't sync: ${error}`));
   }
 }
