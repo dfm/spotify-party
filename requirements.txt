@@ -13,8 +13,6 @@ Jinja2==2.11.1
 MarkupSafe==1.1.1
 multidict==4.7.5
 pycparser==2.20
-python-engineio==3.12.1
-python-socketio==4.5.1
 six==1.14.0
 toml==0.10.0
 yarl==1.4.2

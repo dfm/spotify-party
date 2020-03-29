@@ -1,5 +1,5 @@
 spotify_client_id = "YOUR CLIENT ID"
 spotify_client_secret = "YOUR CLIENT SECRET"
 spotify_redirect_uri = "YOUR CALLBACK URI"
-database_filenam = "/path/to/database.db"
+database_filename = "/path/to/database.db"
 port = 5000

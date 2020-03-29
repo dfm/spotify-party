@@ -8,5 +8,5 @@
     "allowJs": true,
     "allowSyntheticDefaultImports": true
   },
-  "include": ["src/static/**/*"]
+  "include": ["src/frontend/**/*"]
 }
