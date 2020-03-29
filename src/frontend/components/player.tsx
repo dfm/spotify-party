@@ -39,7 +39,7 @@ export class SpotifyPlayer extends React.Component<
 
     // Initialize the player
     const player = new Spotify.Player({
-      name: "Spotify Party",
+      name: "distance.dfm.io",
       volume: 1,
       getOAuthToken: self.props.controller.token
     });
@@ -122,7 +122,6 @@ export class SpotifyPlayer extends React.Component<
   play() {
     console.log("starting to listen");
     if (!this.state.deviceId) return;
-    const self = this;
     this.props.controller.play(this.state.deviceId, this.props.roomId, () => {
       console.log("started listening");
       this.setState({ isPlaying: true });
