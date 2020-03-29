@@ -1,14 +1,13 @@
 __all__ = ["sio"]
 
 from functools import wraps
-from typing import Mapping, Any, Callable, Awaitable
+from typing import Any, Awaitable, Callable, Mapping
 
-import socketio
 import aiohttp_session
+import socketio
 from aiohttp import web
 
-from . import db, api
-
+from . import api, db
 
 sio = socketio.AsyncServer(async_mode="aiohttp")
 

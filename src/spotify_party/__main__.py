@@ -1,6 +1,8 @@
 import argparse
+
 from aiohttp import web
-from spotify_party import get_config, app_factory, create_tables
+
+from spotify_party import app_factory, create_tables, get_config
 
 parser = argparse.ArgumentParser()
 parser.add_argument("config_file", type=str)

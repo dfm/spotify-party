@@ -1,12 +1,11 @@
 __all__ = ["routes"]
 
-from typing import Optional, MutableMapping, Mapping, Any
-
 import asyncio
-from aiohttp import web, ClientResponseError
+from typing import Any, Mapping, MutableMapping, Optional
+
+from aiohttp import ClientResponseError, web
 
 from . import api, db
-
 
 routes = web.RouteTableDef()
 

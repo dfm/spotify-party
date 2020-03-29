@@ -3,10 +3,10 @@ __all__ = ["create_tables", "User", "Room", "Database"]
 import pathlib
 import secrets
 import sqlite3
-import pkg_resources
-from typing import Union, Iterable
+from typing import Iterable, Union
 
 import aiosqlite
+import pkg_resources
 from aiohttp_spotify import SpotifyAuth
 
 
@@ -194,7 +194,7 @@ class Database:
     async def pause_room(self, room_id: str) -> None:
         async with aiosqlite.connect(self.filename) as conn:
             await conn.execute(
-                "UPDATE users SET paused=1 WHERE playing_to=?", (room_id,),
+                "UPDATE users SET paused=1 WHERE playing_to=?", (room_id,)
             )
             await conn.commit()
 

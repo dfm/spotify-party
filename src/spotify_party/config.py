@@ -1,8 +1,8 @@
 __all__ = ["get_config"]
 
-import toml
 from typing import Any, Mapping, MutableMapping
 
+import toml
 
 schema = dict(
     spotify_client_id=(str, None),

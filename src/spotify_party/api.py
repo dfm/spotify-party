@@ -1,7 +1,7 @@
 __all__ = ["require_auth", "handle_auth", "call_api"]
 
-from functools import wraps, partial
-from typing import Callable, Awaitable, Union, Optional, Any
+from functools import partial, wraps
+from typing import Any, Awaitable, Callable, Optional, Union
 
 import aiohttp_session
 from aiohttp import web

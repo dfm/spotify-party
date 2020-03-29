@@ -2,19 +2,18 @@ __all__ = ["app_factory"]
 
 import base64
 import pathlib
-import pkg_resources
-from typing import AsyncIterator, Mapping, Any
+from typing import Any, AsyncIterator, Mapping
 
+import aiohttp_jinja2
+import aiohttp_session
+import aiohttp_spotify
+import jinja2
+import pkg_resources
+from aiohttp import ClientSession, web
+from aiohttp_session.cookie_storage import EncryptedCookieStorage
 from cryptography import fernet
 
-from aiohttp import web, ClientSession
-import aiohttp_session
-from aiohttp_session.cookie_storage import EncryptedCookieStorage
-import jinja2
-import aiohttp_jinja2
-import aiohttp_spotify
-
-from . import db, api, views, interface
+from . import api, db, interface, views
 
 
 def get_resource_path(path: str) -> pathlib.Path:

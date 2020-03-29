@@ -1,10 +1,10 @@
 __all__ = ["routes"]
 
-from aiohttp import web
 import aiohttp_jinja2
 import aiohttp_session
+from aiohttp import web
 
-from . import db, api
+from . import api, db
 
 routes = web.RouteTableDef()
 
