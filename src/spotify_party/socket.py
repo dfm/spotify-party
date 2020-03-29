@@ -67,7 +67,7 @@ async def pause_room(room_id: str) -> None:
     await dbc.pause_room(room_id)
 
     # Tell the clients about the closing
-    await sio.emit("closed", room=room_id)
+    await sio.emit("paused", room=room_id)
 
 
 async def sync_user(request: web.Request, user: db.User) -> None:

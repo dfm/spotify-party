@@ -1,7 +1,7 @@
 __all__ = ["require_auth", "handle_auth", "call_api"]
 
-from functools import wraps
-from typing import Callable, Awaitable, Union
+from functools import wraps, partial
+from typing import Callable, Awaitable, Union, Optional, Any
 
 import aiohttp_session
 from aiohttp import web
@@ -11,9 +11,30 @@ from . import db
 
 
 def require_auth(
-    handler: Callable[[web.Request, db.User], Awaitable]
+    original_handler: Optional[
+        Callable[[web.Request, db.User], Awaitable]
+    ] = None,
+    *,
+    redirect: bool = True,
+) -> Callable[..., Any]:
+    """A decorator requiring that the user is authenticated to see a view
+
+    Args:
+        redirect (bool, optional): If true, the user will be redirected to the
+            login page. Otherwise, a :class:`HTTPUnauthorized error is thrown.
+
+    """
+    if original_handler is None:
+        return partial(_require_auth, redirect=redirect)
+    return _require_auth(original_handler, redirect=redirect)
+
+
+def _require_auth(
+    handler: Callable[[web.Request, db.User], Awaitable],
+    *,
+    redirect: bool = True,
 ) -> Callable[[web.Request], Awaitable]:
-    """A decorator requiring that the user is authenticated to see a view"""
+    """This does the heavy lifting for the authorization check"""
 
     @wraps(handler)
     async def wrapped(request: web.Request) -> web.Response:
@@ -21,6 +42,8 @@ def require_auth(
         user_id = session.get("sp_user_id")
         user = await request.app["db"].get_user(user_id)
         if user_id is None or user is None:
+            if not redirect:
+                raise web.HTTPUnauthorized()
             raise web.HTTPTemporaryRedirect(
                 location=request.app["spotify_app"]
                 .router["auth"]
@@ -56,8 +79,21 @@ async def call_api(
     endpoint: str,
     *,
     method: str = "GET",
-    **kwargs
+    **kwargs,
 ) -> Union[SpotifyResponse, None]:
+    """Call the Spotify API
+
+    Args:
+        request (web.Request): The current request
+        user (Union[db.User, None]): The current user (this call will fail
+            without one)
+        endpoint (str): The API path
+        method (str, optional): The HTTP request method. Defaults to "GET".
+
+    Returns:
+        Union[SpotifyResponse, None]: The response from the API
+
+    """
     if user is None:
         return None
 
@@ -66,7 +102,7 @@ async def call_api(
         user.auth,
         endpoint,
         method=method,
-        **kwargs
+        **kwargs,
     )
 
     # Update the authentication info if required

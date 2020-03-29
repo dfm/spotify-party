@@ -14,7 +14,7 @@ import jinja2
 import aiohttp_jinja2
 import aiohttp_spotify
 
-from . import db, api, views, socket
+from . import db, api, views, interface
 
 
 def get_resource_path(path: str) -> pathlib.Path:
@@ -44,6 +44,7 @@ def app_factory(config: Mapping[str, Any]) -> web.Application:
 
     # And the routes for the main app
     app.add_routes(views.routes)
+    app.add_routes(interface.routes)
 
     # Set up the user session for cookies
     secret_key = base64.urlsafe_b64decode(fernet.Fernet.generate_key())
@@ -53,8 +54,8 @@ def app_factory(config: Mapping[str, Any]) -> web.Application:
     aiohttp_jinja2.setup(
         app, loader=jinja2.FileSystemLoader(get_resource_path("templates"))
     )
-    app["static_root_url"] = "/static"
-    app.router.add_static("/static", get_resource_path("static"))
+    app["static_root_url"] = "/assets"
+    app.router.add_static("/assets", get_resource_path("assets"))
 
     # Set up the Spotify app to instigate the OAuth flow
     app["spotify_app"] = aiohttp_spotify.spotify_app(
@@ -74,8 +75,5 @@ def app_factory(config: Mapping[str, Any]) -> web.Application:
     )
     app["spotify_app"]["main_app"] = app
     app.add_subapp("/spotify", app["spotify_app"])
-
-    # Connect the sockets app
-    socket.sio.attach(app)
 
     return app
