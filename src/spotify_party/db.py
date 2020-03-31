@@ -298,7 +298,7 @@ class Database:
                 """UPDATE users SET
                     access_token=?,
                     refresh_token=?,
-                    expores_at=?
+                    expires_at=?
                 WHERE user_id=?""",
                 (
                     auth.access_token,
