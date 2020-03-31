@@ -42,6 +42,7 @@ def _require_auth(
         session = await aiohttp_session.get_session(request)
         user_id = session.get("sp_user_id")
         user = await request.app["db"].get_user(user_id)
+        await user.update_auth(request)
         if user_id is None or user is None:
             if not redirect:
                 raise web.HTTPUnauthorized()
@@ -78,7 +79,7 @@ async def update_auth(
     request: web.Request, auth: SpotifyAuth
 ) -> Tuple[bool, SpotifyAuth]:
     auth_changed = False
-    if auth.expires_at - time.time() <= 60:
+    if auth.expires_at - time.time() <= 600:  # 10 minutes
         auth_changed = True
         auth = await request.app["spotify_app"]["spotify_client"].update_auth(
             request.app["client_session"], auth

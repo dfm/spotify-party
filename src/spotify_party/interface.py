@@ -140,5 +140,4 @@ async def sync(request: web.Request, user: db.User) -> web.Response:
         return web.json_response(
             {"error": "Unable to sync playback"}, status=404
         )
-
     return web.HTTPNoContent()
