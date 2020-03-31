@@ -42,8 +42,7 @@ def _require_auth(
         session = await aiohttp_session.get_session(request)
         user_id = session.get("sp_user_id")
         user = await request.app["db"].get_user(user_id)
-        await user.update_auth(request)
-        if user_id is None or user is None:
+        if user is None:
             if not redirect:
                 raise web.HTTPUnauthorized()
             raise web.HTTPTemporaryRedirect(
@@ -52,6 +51,7 @@ def _require_auth(
                 .url_for()
                 .with_query(redirect=request.url.path)
             )
+        await user.update_auth(request)
         return await handler(request, user)
 
     return wrapped
