@@ -136,8 +136,6 @@ async def pause(request: web.Request, user: db.User) -> web.Response:
 @routes.put("/api/sync", name="interface.sync")
 @api.require_auth(redirect=False)
 async def sync(request: web.Request, user: db.User) -> web.Response:
-    data = await request.json()
-
     if not await user.sync(request):
         return web.json_response(
             {"error": "Unable to sync playback"}, status=404

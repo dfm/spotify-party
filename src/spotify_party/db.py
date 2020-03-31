@@ -198,6 +198,7 @@ class User:
         retries: int = DEFAULT_RETRIES,
     ) -> bool:
         await self.set_device_id(device_id)
+        self.device_id = device_id
 
         success = await self.stop(request)
 
