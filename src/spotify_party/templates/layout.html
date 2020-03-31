@@ -13,17 +13,18 @@
     {% block extrahead %} {% endblock %}
   </head>
   <body class="text-center">
-    <div class="d-flex w-100 h-100 p-3 mx-auto flex-column">
+    <div class="container d-flex w-100 h-100 p-3 mx-auto flex-column">
       <header class="masthead mb-auto">
         <div class="inner">
           <nav class="nav nav-masthead justify-content-center">
             <a class="nav-link" href="{{ url('about') }}">About</a>
+            <a
+              class="nav-link{% if current_page == 'play' %} active {% endif %}"
+              href="{{ url('play') }}"
+              >Broadcast</a
+            >
             {% if is_logged_in %}
             <a class="nav-link" href="{{ url('logout') }}">Log out</a>
-            {% else %}
-            <a class="nav-link" href="{{ url('login') }}"
-              >Log in with Spotify</a
-            >
             {% endif %}
           </nav>
         </div>
@@ -38,7 +39,11 @@
             <a href="https://github.com/dfm/spotify-party"
               >open source project</a
             >
-            by <a href="https://dfm.io">Dan F-M</a>.
+            by <a href="https://dfm.io">Dan F-M</a>.<br />
+            Please
+            <a href="https://github.com/dfm/spotify-party/issues"
+              >report issues on GitHub</a
+            >.
           </p>
         </div>
       </footer>

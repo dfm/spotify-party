@@ -1,0 +1,19 @@
+{% extends "layout.html" %}
+<!--  -->
+{% block extrahead %}
+<link rel="stylesheet" href="{{ static('splash.css') }}" />
+{% endblock %}
+<!--  -->
+{% block body %}
+<main role="main" class="inner cover">
+  <h1 class="cover-heading">Uh oh.</h1>
+  <p class="lead">
+    The Spotify API only works for users with Spotify Premium accounts so this
+    service isn't available to you at this time. Sorry! You can
+    <a href="https://www.spotify.com/us/premium"
+      >click here to upgrade your account</a
+    >
+    (this isn't a referral link or anything like that).
+  </p>
+</main>
+{% endblock %}

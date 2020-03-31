@@ -31,7 +31,7 @@ export class StreamLink extends React.Component<
   render() {
     return (
       <Button
-        text={this.state.isCopied ? "Copied to clipboard" : "Copy stream URL"}
+        text={this.state.isCopied ? "Copied to clipboard" : "Copy link"}
         enabled={this.props.streamUrl ? true : false}
         onClick={() => {
           this.handleClick();

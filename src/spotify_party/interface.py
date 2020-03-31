@@ -112,11 +112,12 @@ async def listen(request: web.Request, user: db.User) -> web.Response:
     if room is None:
         return web.json_response({"error": "Invalid room_id"}, status=404)
 
-    if not await user.listen_to(request, room, device_id=device_id):
+    data = await user.listen_to(request, room, device_id=device_id)
+    if data is None:
         return web.json_response({"error": "Unable to start listening"})
 
     # It worked!
-    return web.HTTPNoContent()
+    return web.json_response(data)
 
 
 @routes.put("/api/pause", name="interface.pause")
@@ -136,8 +137,9 @@ async def pause(request: web.Request, user: db.User) -> web.Response:
 @routes.put("/api/sync", name="interface.sync")
 @api.require_auth(redirect=False)
 async def sync(request: web.Request, user: db.User) -> web.Response:
-    if not await user.sync(request):
+    data = await user.sync(request)
+    if data is None:
         return web.json_response(
             {"error": "Unable to sync playback"}, status=404
         )
-    return web.HTTPNoContent()
+    return web.json_response(data)

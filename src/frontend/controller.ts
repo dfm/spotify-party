@@ -1,3 +1,11 @@
+export interface TrackInfo {
+  uri: string;
+  name: string;
+  type: string;
+  id: string;
+  position_ms?: number;
+}
+
 export class Controller {
   token(callback: (token: string) => void) {
     fetch("/api/token", { method: "POST" })
@@ -28,27 +36,31 @@ export class Controller {
     req.catch(error => console.log(`couldn't close: ${error}`));
   }
 
-  change(uri: string, position_ms?: number, callback?: () => void) {
+  change(data: TrackInfo, callback?: () => void) {
     const req = fetch("/api/change", {
       method: "PUT",
       headers: {
         "Content-Type": "application/json"
       },
-      body: JSON.stringify({ uri: uri, position_ms: position_ms })
+      body: JSON.stringify(data)
     });
     if (callback) req.then(() => callback());
     req.catch(error => console.log(`couldn't change: ${error}`));
   }
 
-  listen(deviceId: string, roomId: string, callback?: () => void) {
+  listen(
+    deviceId: string,
+    roomId: string,
+    callback?: (data: TrackInfo) => void
+  ) {
     const req = fetch("/api/listen", {
       method: "PUT",
       headers: {
         "Content-Type": "application/json"
       },
       body: JSON.stringify({ device_id: deviceId, room_id: roomId })
-    });
-    if (callback) req.then(() => callback());
+    }).then(response => response.json());
+    if (callback) req.then(data => callback(data));
     req.catch(error => console.log(`couldn't listen: ${error}`));
   }
 
@@ -58,15 +70,15 @@ export class Controller {
     req.catch(error => console.log(`couldn't pause: ${error}`));
   }
 
-  sync(deviceId: string, callback?: () => void) {
+  sync(deviceId: string, callback?: (data: TrackInfo) => void) {
     const req = fetch("/api/sync", {
       method: "PUT",
       headers: {
         "Content-Type": "application/json"
       },
       body: JSON.stringify({ device_id: deviceId })
-    });
-    if (callback) req.then(() => callback());
+    }).then(response => response.json());
+    if (callback) req.then(data => callback(data));
     req.catch(error => console.log(`couldn't sync: ${error}`));
   }
 }

@@ -72,9 +72,10 @@ class User:
 
     async def set_device_id(self, device_id: str) -> None:
         await self.database.set_device_id(self.user_id, device_id)
+        self.device_id = device_id
 
     async def transfer(
-        self, request: web.Request, *, check: bool = True
+        self, request: web.Request, *, play: bool = False, check: bool = True
     ) -> bool:
         if self.device_id is None:
             return False
@@ -86,7 +87,7 @@ class User:
                 self,
                 "/me/player",
                 method="PUT",
-                json=dict(device_ids=[self.device_id]),
+                json=dict(device_ids=[self.device_id], play=play),
             )
         except ClientResponseError as e:
             print(f"'/me/player' returned {e.status}")
@@ -99,6 +100,7 @@ class User:
                 return False
             return any(
                 device.get("is_active", False)
+                and (device.get("id", None) == self.device_id)
                 for device in response.json().get("devices", [])
             )
 
@@ -149,7 +151,7 @@ class User:
             if e.status not in (403, 404):
                 raise
 
-            flag = await self.transfer(request, check=False)
+            flag = await self.transfer(request, play=True, check=False)
             if flag and retries > 0:
                 await asyncio.sleep(1)
                 return await self.play(request, data, retries=retries - 1)
@@ -168,26 +170,36 @@ class User:
 
     async def sync(
         self, request: web.Request, *, retries: int = DEFAULT_RETRIES
-    ) -> bool:
+    ) -> Union[Mapping[str, Any], None]:
         room = await self.listening_to
         if room is None:
-            return False
+            return None
 
         data = await room.host.currently_playing(request)
         if data is None:
-            return False
+            return None
 
         uri = data.get("item", {}).get("uri", None)
         position_ms = data.get("progress_ms", None)
         is_playing = data.get("is_playing", False)
 
         if is_playing and uri is not None and position_ms is not None:
-            return await self.play(
+            flag = await self.play(
                 request,
                 dict(uris=[uri], position_ms=position_ms),
                 retries=retries,
             )
-        return await self.pause(request, retries=retries)
+        else:
+            flag = await self.pause(request, retries=retries)
+
+        return {
+            "success": flag,
+            "uri": uri,
+            "name": data.get("name", None),
+            "type": data.get("type", None),
+            "id": data.get("id", None),
+            "position_ms": position_ms,
+        }
 
     async def listen_to(
         self,
@@ -196,17 +208,16 @@ class User:
         device_id: str,
         *,
         retries: int = DEFAULT_RETRIES,
-    ) -> bool:
+    ) -> Union[Mapping[str, Any], None]:
         await self.set_device_id(device_id)
-        self.device_id = device_id
 
-        success = await self.stop(request)
+        await self.stop(request)
 
         await self.database.listen_to(self.user_id, room.room_id)
         self.listening_to_id = room.room_id
         self.paused = False
 
-        return success and await self.sync(request, retries=retries)
+        return await self.sync(request, retries=retries)
 
     async def play_to(
         self,
@@ -217,7 +228,7 @@ class User:
     ) -> Union[str, None]:
         await self.set_device_id(device_id)
 
-        flag = await self.play(request, {})
+        flag = await self.transfer(request, play=False, check=True)
         if not flag:
             return None
 

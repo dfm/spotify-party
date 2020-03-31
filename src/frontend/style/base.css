@@ -3,11 +3,6 @@
  */
 
 /* Links */
-a,
-a:focus,
-a:hover {
-  color: #333;
-}
 
 /* Custom default button */
 .btn-secondary,
@@ -33,6 +28,10 @@ body {
   display: -ms-flexbox;
   display: flex;
   color: #333;
+}
+
+.container {
+  min-width: 400px;
 }
 
 /*
@@ -83,11 +82,8 @@ body {
   color: rgba(0, 0, 0, 0.5);
 }
 
-.sp-icon {
-  height: 2rem;
-  padding-right: 0.5rem;
-}
-
-.sp-icon path {
-  fill: #fff;
+.mastfoot a,
+.mastfoot a:focus,
+.mastfoot a:hover {
+  color: #333;
 }

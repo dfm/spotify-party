@@ -67,6 +67,12 @@ async def handle_auth(request: web.Request, auth: SpotifyAuth) -> None:
         raise web.HTTPInternalServerError()
 
     user_info = response.json()
+
+    if user_info.get("product", "free") != "premium":
+        raise web.HTTPTemporaryRedirect(
+            location=request.app.router["premium"].url_for()
+        )
+
     user = await main_app["db"].add_user(
         user_info["id"], user_info["display_name"], response.auth
     )

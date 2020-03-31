@@ -21,7 +21,12 @@ async def index(request: web.Request) -> web.Response:
 
 @routes.get("/about", name="about")
 async def about(request: web.Request) -> web.Response:
-    return web.Response(body="about page")
+    return aiohttp_jinja2.render_template("about.html", request, {})
+
+
+@routes.get("/premium", name="premium")
+async def premium(request: web.Request) -> web.Response:
+    return aiohttp_jinja2.render_template("premium.html", request, {})
 
 
 @routes.get("/login", name="login")
@@ -50,7 +55,7 @@ async def logout(request: web.Request) -> web.Response:
 @api.require_auth
 async def play(request: web.Request, user: db.User) -> web.Response:
     return aiohttp_jinja2.render_template(
-        "play.html", request, {"is_logged_in": True}
+        "play.html", request, {"is_logged_in": True, "current_page": "play"}
     )
 
 
