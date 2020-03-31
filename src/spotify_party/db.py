@@ -111,10 +111,7 @@ class User:
             await api.call_api(request, self, "/me/player/pause", method="PUT")
 
         except ClientResponseError as e:
-            if e.status == 403:
-                return False
-
-            if e.status != 404:
+            if e.status not in (403, 404):
                 raise
 
             flag = await self.transfer(request, check=False)
@@ -149,7 +146,7 @@ class User:
             )
 
         except ClientResponseError as e:
-            if e.status != 404:
+            if e.status not in (403, 404):
                 raise
 
             flag = await self.transfer(request, check=False)
