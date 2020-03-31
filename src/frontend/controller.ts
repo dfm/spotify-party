@@ -40,8 +40,8 @@ export class Controller {
     req.catch(error => console.log(`couldn't change: ${error}`));
   }
 
-  play(deviceId: string, roomId: string, callback?: () => void) {
-    const req = fetch("/api/play", {
+  listen(deviceId: string, roomId: string, callback?: () => void) {
+    const req = fetch("/api/listen", {
       method: "PUT",
       headers: {
         "Content-Type": "application/json"
@@ -49,7 +49,7 @@ export class Controller {
       body: JSON.stringify({ device_id: deviceId, room_id: roomId })
     });
     if (callback) req.then(() => callback());
-    req.catch(error => console.log(`couldn't play: ${error}`));
+    req.catch(error => console.log(`couldn't listen: ${error}`));
   }
 
   pause(callback?: () => void) {

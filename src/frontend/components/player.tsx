@@ -119,10 +119,10 @@ export class SpotifyPlayer extends React.Component<
     });
   }
 
-  play() {
+  listen() {
     console.log("starting to listen");
     if (!this.state.deviceId) return;
-    this.props.controller.play(this.state.deviceId, this.props.roomId, () => {
+    this.props.controller.listen(this.state.deviceId, this.props.roomId, () => {
       console.log("started listening");
       this.setState({ isPlaying: true });
     });
@@ -147,7 +147,7 @@ export class SpotifyPlayer extends React.Component<
       const text = this.state.isPlaying ? "Stop listening" : "Start listening";
       const action = this.state.isPlaying
         ? () => this.pause()
-        : () => this.play();
+        : () => this.listen();
 
       return (
         <p className="lead">

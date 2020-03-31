@@ -6,5 +6,6 @@ CREATE TABLE users (
     expires_at INT,
     listening_to TEXT,
     playing_to TEXT UNIQUE,
-    paused INT DEFAULT 0
+    paused INT DEFAULT 0,
+    device_id TEXT
 )

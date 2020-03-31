@@ -1,7 +1,8 @@
-__all__ = ["require_auth", "handle_auth", "call_api"]
+__all__ = ["require_auth", "handle_auth", "update_auth", "call_api"]
 
+import time
 from functools import partial, wraps
-from typing import Any, Awaitable, Callable, Optional, Union
+from typing import Any, Awaitable, Callable, Optional, Tuple, Union
 
 import aiohttp_session
 from aiohttp import web
@@ -71,6 +72,18 @@ async def handle_auth(request: web.Request, auth: SpotifyAuth) -> None:
 
     session = await aiohttp_session.get_session(request)
     session["sp_user_id"] = user.user_id
+
+
+async def update_auth(
+    request: web.Request, auth: SpotifyAuth
+) -> Tuple[bool, SpotifyAuth]:
+    auth_changed = False
+    if auth.expires_at - time.time() <= 60:
+        auth_changed = True
+        auth = await request.app["spotify_app"]["spotify_client"].update_auth(
+            request.app["client_session"], auth
+        )
+    return auth_changed, auth
 
 
 async def call_api(
