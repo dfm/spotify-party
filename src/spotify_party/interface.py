@@ -4,6 +4,7 @@ from typing import Any, Dict, Mapping
 
 import aiohttp_session
 import socketio
+import yarl
 from aiohttp import web
 
 from . import api, db
@@ -99,14 +100,11 @@ async def stream(request: web.Request, user: db.User) -> web.Response:
             {"error": "Unable to transfer device"}, status=404
         )
 
-    response: Dict[str, Any] = {
-        "room_id": room_id,
-        "stream_url": str(
-            request.url.join(
-                request.app.router["listen"].url_for(room_id=room_id)
-            )
-        ),
-    }
+    url = yarl.URL(request.app["config"]["base_url"]).with_path(
+        f"/listen/{room_id}"
+    )
+    print(url)
+    response: Dict[str, Any] = {"room_id": room_id, "stream_url": str(url)}
 
     current = await user.currently_playing(request)
     if current is not None:
