@@ -16,18 +16,23 @@ export class Controller {
 
   stream(
     device_id: string,
-    callback: (room_id: string, stream_url: string) => void
+    room_id?: string,
+    callback?: (
+      room_id: string,
+      stream_url: string,
+      playing?: TrackInfo
+    ) => void
   ) {
-    fetch("/api/stream", {
+    const req = fetch("/api/stream", {
       method: "PUT",
       headers: {
         "Content-Type": "application/json"
       },
-      body: JSON.stringify({ device_id: device_id })
-    })
-      .then(response => response.json())
-      .then(data => callback(data.room_id, data.stream_url))
-      .catch(error => console.log(`couldn't get stream: ${error}`));
+      body: JSON.stringify({ device_id: device_id, room_id: room_id })
+    }).then(response => response.json());
+    if (callback)
+      req.then(data => callback(data.room_id, data.stream_url, data.playing));
+    req.catch(error => console.log(`couldn't get stream: ${error}`));
   }
 
   close(callback?: () => void) {
@@ -51,7 +56,7 @@ export class Controller {
   listen(
     deviceId: string,
     roomId: string,
-    callback?: (data: TrackInfo) => void
+    callback?: (listeners: number, data: TrackInfo) => void
   ) {
     const req = fetch("/api/listen", {
       method: "PUT",
@@ -60,7 +65,7 @@ export class Controller {
       },
       body: JSON.stringify({ device_id: deviceId, room_id: roomId })
     }).then(response => response.json());
-    if (callback) req.then(data => callback(data));
+    if (callback) req.then(data => callback(data.number, data.playing));
     req.catch(error => console.log(`couldn't listen: ${error}`));
   }
 

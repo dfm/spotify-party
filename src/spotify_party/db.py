@@ -4,7 +4,17 @@ import asyncio
 import pathlib
 import secrets
 import sqlite3
-from typing import Any, Iterable, Mapping, MutableMapping, Optional, Union
+from typing import (
+    Any,
+    Dict,
+    Iterable,
+    List,
+    Mapping,
+    MutableMapping,
+    Optional,
+    Tuple,
+    Union,
+)
 
 import aiosqlite
 import pkg_resources
@@ -116,10 +126,13 @@ class User:
             if e.status not in (403, 404):
                 raise
 
-            flag = await self.transfer(request, check=False)
-            if flag and retries > 0:
-                await asyncio.sleep(1)
-                return await self.pause(request, retries=retries - 1)
+            # if not transfer:
+            #     return False
+
+            # flag = await self.transfer(request, check=False)
+            # if flag and retries > 0:
+            #     await asyncio.sleep(1)
+            #     return await self.pause(request, retries=retries - 1)
 
             return False
 
@@ -127,13 +140,15 @@ class User:
 
     async def stop(self, request: web.Request) -> bool:
         """Like pause, but update the database too"""
-        await request.app["db"].stop(self.user_id)
-
         room = await self.playing_to
         if room is None:
-            return await self.pause(request)
+            flag = await self.pause(request)
+        else:
+            flag = await room.stop(request)
 
-        return await room.stop(request)
+        await request.app["db"].stop(self.user_id)
+
+        return flag
 
     async def play(
         self,
@@ -162,11 +177,22 @@ class User:
 
     async def currently_playing(
         self, request: web.Request
-    ) -> Union[Mapping[str, Any], None]:
+    ) -> Union[Dict[str, Any], None]:
         response = await api.call_api(
             request, self, "/me/player/currently-playing"
         )
-        return None if response is None else response.json()
+        if response is None:
+            return None
+        data = response.json()
+        item = data.get("item", {})
+        return {
+            "uri": item.get("uri", None),
+            "name": item.get("name", None),
+            "type": item.get("type", None),
+            "id": item.get("id", None),
+            "position_ms": data.get("progress_ms", None),
+            "is_playing": data.get("is_playing", False),
+        }
 
     async def sync(
         self, request: web.Request, *, retries: int = DEFAULT_RETRIES
@@ -179,27 +205,20 @@ class User:
         if data is None:
             return None
 
-        uri = data.get("item", {}).get("uri", None)
-        position_ms = data.get("progress_ms", None)
-        is_playing = data.get("is_playing", False)
-
-        if is_playing and uri is not None and position_ms is not None:
-            flag = await self.play(
+        if (
+            data.pop("is_playing")
+            and data["uri"] is not None
+            and data["position_ms"] is not None
+        ):
+            await self.play(
                 request,
-                dict(uris=[uri], position_ms=position_ms),
+                dict(uris=[data["uri"]], position_ms=data["position_ms"]),
                 retries=retries,
             )
         else:
-            flag = await self.pause(request, retries=retries)
+            await self.pause(request, retries=retries)
 
-        return {
-            "success": flag,
-            "uri": uri,
-            "name": data.get("name", None),
-            "type": data.get("type", None),
-            "id": data.get("id", None),
-            "position_ms": position_ms,
-        }
+        return data
 
     async def listen_to(
         self,
@@ -225,19 +244,19 @@ class User:
         device_id: str,
         *,
         room_id: Optional[str] = None,
-    ) -> Union[str, None]:
+    ) -> Optional[str]:
         await self.set_device_id(device_id)
-
-        flag = await self.transfer(request, play=False, check=True)
-        if not flag:
-            return None
 
         await self.stop(request)
 
-        if room_id is None or room_id != self.playing_to_id:
-            room_id = await self.database.add_room(self)
-        else:
-            await self.database.unpause_user(self.user_id)
+        flag = await self.play(request, {})
+        if not flag:
+            return None
+
+        room = await self.database.get_room(room_id)
+        if room is not None:
+            room_id = None
+        room_id = await self.database.add_room(self, room_id=room_id)
 
         self.listening_to_id = None
         self.playing_to_id = room_id
@@ -261,7 +280,7 @@ class Room:
         return cls(User(database, *row))
 
     @property
-    async def listeners(self) -> Iterable[Union[User, None]]:
+    async def listeners(self) -> List[Union[User, None]]:
         return await self.host.database.get_listeners(self.room_id)
 
     async def play(
@@ -418,8 +437,9 @@ class Database:
             ) as cursor:
                 return Room.from_row(self, await cursor.fetchone())
 
-    async def add_room(self, host: User) -> str:
-        room_id = secrets.token_urlsafe()
+    async def add_room(self, host: User, room_id: Optional[str] = None) -> str:
+        if room_id is None:
+            room_id = secrets.token_urlsafe()
         async with aiosqlite.connect(self.filename) as conn:
             await conn.execute(
                 "UPDATE users SET playing_to=?, paused=0 WHERE user_id=?",
@@ -449,7 +469,7 @@ class Database:
 
     async def get_listeners(
         self, room_id: Union[str, None]
-    ) -> Iterable[Union[User, None]]:
+    ) -> List[Union[User, None]]:
         if room_id is None:
             return []
         async with aiosqlite.connect(self.filename) as conn:

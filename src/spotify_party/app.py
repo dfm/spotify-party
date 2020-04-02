@@ -75,4 +75,7 @@ def app_factory(config: Mapping[str, Any]) -> web.Application:
     app["spotify_app"]["main_app"] = app
     app.add_subapp("/spotify", app["spotify_app"])
 
+    # Attach the socket.io interface
+    interface.sio.attach(app)
+
     return app

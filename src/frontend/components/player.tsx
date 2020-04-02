@@ -1,5 +1,6 @@
 import React from "react";
 import ReactDOM from "react-dom";
+import io from "socket.io-client";
 
 import { Controller, TrackInfo } from "../controller";
 import { Button } from "./button";
@@ -8,6 +9,7 @@ import { NowPlaying } from "./now-playing";
 
 interface SpotifyPlayerProps {
   controller: Controller;
+  isListener: boolean;
   roomId?: string;
 }
 
@@ -15,8 +17,10 @@ interface SpotifyPlayerState {
   isPlaying: boolean;
   deviceId?: string;
   streamUrl?: string;
+  roomId?: string;
   whatsNext: number;
   nowPlaying?: TrackInfo;
+  listeners: number;
 }
 
 const stateText = {
@@ -36,6 +40,7 @@ export class SpotifyPlayer extends React.Component<
   SpotifyPlayerProps,
   SpotifyPlayerState
 > {
+  socket: SocketIOClient.Socket;
   player: Spotify.SpotifyPlayer;
   isPaused: boolean;
   currentTrack?: string;
@@ -51,9 +56,31 @@ export class SpotifyPlayer extends React.Component<
     this.state = {
       isPlaying: false,
       streamUrl: null,
+      roomId: props.roomId,
       deviceId: null,
-      whatsNext: 0
+      whatsNext: 0,
+      listeners: 0
     };
+
+    // Initialize the socket
+    this.socket = io.connect();
+    this.socket.on("listeners", (data: any) => {
+      console.log(data);
+      self.setState({ listeners: data.number });
+    });
+    this.socket.on("changed", (data: any) => {
+      console.log(data);
+      self.setState({ listeners: data.number, nowPlaying: data.playing });
+    });
+    this.socket.on("close", () => {
+      console.log("closing");
+      self.setState({
+        isPlaying: false,
+        whatsNext: 1,
+        listeners: 0,
+        nowPlaying: null
+      });
+    });
 
     // Initialize the player
     this.player = new Spotify.Player({
@@ -70,32 +97,34 @@ export class SpotifyPlayer extends React.Component<
     this.player.addListener("player_state_changed", state => {
       console.log("player_state_changed", state);
 
-      if (self.state.isPlaying) {
-        if (!state) {
-          self.stop();
-          return;
-        }
+      if (self.props.isListener || !self.state.isPlaying) {
+        return;
+      }
 
-        const track = state.track_window.current_track;
-        const data: TrackInfo = {
-          uri: track.uri,
-          type: track.type,
-          name: track.name,
-          id: track.id
-        };
-        this.setState({ nowPlaying: data });
-        if (state.paused && !self.isPaused) {
-          self.isPaused = true;
-          self.props.controller.pause();
-        } else if (!state.paused && self.isPaused) {
-          self.isPaused = false;
-          self.currentTrack = data.uri;
-          data.position_ms = state.position;
-          self.props.controller.change(data);
-        } else if (!state.paused && self.currentTrack != data.uri) {
-          self.currentTrack = data.uri;
-          self.props.controller.change(data);
-        }
+      if (!state) {
+        self.stop();
+        return;
+      }
+
+      const track = state.track_window.current_track;
+      const data: TrackInfo = {
+        uri: track.uri,
+        type: track.type,
+        name: track.name,
+        id: track.id
+      };
+      this.setState({ nowPlaying: data });
+      if (state.paused && !self.isPaused) {
+        self.isPaused = true;
+        self.props.controller.pause();
+      } else if (!state.paused && self.isPaused) {
+        self.isPaused = false;
+        self.currentTrack = data.uri;
+        data.position_ms = state.position;
+        self.props.controller.change(data);
+      } else if (!state.paused && self.currentTrack != data.uri) {
+        self.currentTrack = data.uri;
+        self.props.controller.change(data);
       }
     });
 
@@ -120,50 +149,81 @@ export class SpotifyPlayer extends React.Component<
   }
 
   start() {
+    if (this.props.isListener) return;
     console.log("starting broadcast");
     if (!this.state.deviceId) return;
     this.setState({ whatsNext: 0 });
     const self = this;
     this.props.controller.stream(
       this.state.deviceId,
-      (roomId: string, streamUrl: string) => {
+      this.state.roomId,
+      (roomId: string, streamUrl: string, playing?: TrackInfo) => {
         console.log("started broadcast");
+        self.socket.emit("join", roomId);
         self.setState({
           isPlaying: true,
           streamUrl: streamUrl,
-          whatsNext: 2
+          roomId: roomId,
+          whatsNext: 2,
+          nowPlaying: playing
         });
       }
     );
   }
 
   stop() {
+    if (this.props.isListener) return;
     console.log("stopping broadcast");
     this.setState({ whatsNext: 0 });
     const self = this;
     this.props.controller.close(() => {
       console.log("stopped broadcast");
-      self.setState({ isPlaying: false, streamUrl: null, whatsNext: 1 });
+      self.socket.emit("leave", self.state.roomId);
+      self.setState({
+        isPlaying: false,
+        streamUrl: null,
+        whatsNext: 1,
+        listeners: 0
+      });
     });
   }
 
   listen() {
+    if (!this.props.isListener) return;
     console.log("starting to listen");
     if (!this.state.deviceId) return;
     this.setState({ whatsNext: 0 });
-    this.props.controller.listen(this.state.deviceId, this.props.roomId, () => {
-      console.log("started listening");
-      this.setState({ isPlaying: true, whatsNext: 2 });
-    });
+    const self = this;
+    this.props.controller.listen(
+      this.state.deviceId,
+      this.props.roomId,
+      (listeners: number, nowPlaying: TrackInfo) => {
+        console.log("started listening");
+        self.socket.emit("join", self.props.roomId);
+        self.setState({
+          isPlaying: true,
+          whatsNext: 2,
+          listeners: listeners,
+          nowPlaying: nowPlaying
+        });
+      }
+    );
   }
 
   pause() {
+    if (!this.props.isListener) return;
     console.log("stopping listening");
     this.setState({ whatsNext: 0 });
     const self = this;
     this.props.controller.pause(() => {
       console.log("stopped listening");
-      self.setState({ isPlaying: false, whatsNext: 1 });
+      self.socket.emit("leave", self.props.roomId);
+      self.setState({
+        isPlaying: false,
+        whatsNext: 1,
+        nowPlaying: null,
+        listeners: 0
+      });
     });
   }
 
@@ -171,9 +231,10 @@ export class SpotifyPlayer extends React.Component<
     console.log("syncing");
     this.setState({ whatsNext: 0 });
     const self = this;
-    this.props.controller.sync(this.state.deviceId, () => {
+    this.props.controller.sync(this.state.deviceId, data => {
+      console.log(data);
       console.log("finished syncing");
-      self.setState({ whatsNext: 2 });
+      self.setState({ whatsNext: 2, nowPlaying: data });
     });
   }
 
@@ -182,7 +243,7 @@ export class SpotifyPlayer extends React.Component<
     let text: string;
     let action: () => void;
     let button2: JSX.Element;
-    if (this.props.roomId) {
+    if (this.props.isListener) {
       whatsNext = stateText.listen[this.state.whatsNext];
       text = this.state.isPlaying ? "Stop listening" : "Start listening";
       action = this.state.isPlaying ? () => this.pause() : () => this.listen();
@@ -202,7 +263,10 @@ export class SpotifyPlayer extends React.Component<
 
     return (
       <div>
-        <NowPlaying trackInfo={this.state.nowPlaying} />
+        <NowPlaying
+          trackInfo={this.state.nowPlaying}
+          listeners={this.state.listeners}
+        />
         <p className="lead">
           <Button
             text={text}
@@ -218,7 +282,10 @@ export class SpotifyPlayer extends React.Component<
 }
 
 export const renderPlayer = (controller: Controller, div: Element) => {
-  ReactDOM.render(<SpotifyPlayer controller={controller} />, div);
+  ReactDOM.render(
+    <SpotifyPlayer controller={controller} isListener={false} />,
+    div
+  );
 };
 
 export const renderListener = (
@@ -227,7 +294,7 @@ export const renderListener = (
   roomId: string
 ) => {
   ReactDOM.render(
-    <SpotifyPlayer controller={controller} roomId={roomId} />,
+    <SpotifyPlayer controller={controller} roomId={roomId} isListener={true} />,
     div
   );
 };

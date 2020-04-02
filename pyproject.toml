@@ -26,4 +26,4 @@ multi_line_output = 3
 include_trailing_comma = true
 force_grid_wrap = 0
 use_parentheses = true
-known_third_party = ["aiohttp", "aiohttp_jinja2", "aiohttp_session", "aiohttp_spotify", "aiosqlite", "cryptography", "jinja2", "pkg_resources", "setuptools", "toml"]
+known_third_party = ["aiohttp", "aiohttp_jinja2", "aiohttp_session", "aiohttp_spotify", "aiosqlite", "cryptography", "jinja2", "pkg_resources", "setuptools", "socketio", "toml"]

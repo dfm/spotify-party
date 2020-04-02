@@ -12,4 +12,7 @@ window.onSpotifyWebPlaybackSDKReady = () => {
     document.getElementById("player"),
     window.location.pathname.split("/").pop()
   );
+  window.addEventListener("beforeunload", () => {
+    navigator.sendBeacon("/stop");
+  });
 };
