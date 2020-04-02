@@ -17,6 +17,7 @@ def require_auth(
     ] = None,
     *,
     redirect: bool = True,
+    admin: bool = False,
 ) -> Callable[..., Any]:
     """A decorator requiring that the user is authenticated to see a view
 
@@ -26,14 +27,15 @@ def require_auth(
 
     """
     if original_handler is None:
-        return partial(_require_auth, redirect=redirect)
-    return _require_auth(original_handler, redirect=redirect)
+        return partial(_require_auth, redirect=redirect, admin=admin)
+    return _require_auth(original_handler, redirect=redirect, admin=admin)
 
 
 def _require_auth(
     handler: Callable[[web.Request, db.User], Awaitable],
     *,
     redirect: bool = True,
+    admin: bool = False,
 ) -> Callable[[web.Request], Awaitable]:
     """This does the heavy lifting for the authorization check"""
 
@@ -43,6 +45,8 @@ def _require_auth(
         user_id = session.get("sp_user_id")
         user = await request.app["db"].get_user(user_id)
         if user is None:
+            if admin:
+                return web.HTTPNotFound()
             if not redirect:
                 raise web.HTTPUnauthorized()
             raise web.HTTPTemporaryRedirect(
@@ -51,6 +55,10 @@ def _require_auth(
                 .url_for()
                 .with_query(redirect=request.url.path)
             )
+
+        if admin and user.user_id not in request.app["config"]["admins"]:
+            return web.HTTPNotFound()
+
         await user.update_auth(request)
         return await handler(request, user)
 

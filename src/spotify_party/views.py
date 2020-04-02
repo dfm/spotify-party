@@ -75,3 +75,30 @@ async def listen(request: web.Request, user: db.User) -> web.Response:
     return aiohttp_jinja2.render_template(
         "listen.html", request, {"is_logged_in": True}
     )
+
+
+#
+# Stats pages
+#
+
+
+@routes.get("/admin", name="admin")
+@api.require_auth(admin=True)
+async def admin(request: web.Request, user: db.User) -> web.Response:
+    stats = await request.app["db"].get_room_stats()
+    return aiohttp_jinja2.render_template(
+        "admin.html", request, {"stats": stats}
+    )
+
+
+@routes.get("/admin/{room_id}", name="admin.room")
+@api.require_auth(admin=True)
+async def admin_room(request: web.Request, user: db.User) -> web.Response:
+    room = await request.app["db"].get_room(request.match_info["room_id"])
+    if room is None:
+        return web.HTTPNotFound()
+    return aiohttp_jinja2.render_template(
+        "admin.room.html",
+        request,
+        {"room": room, "listeners": await room.listeners},
+    )

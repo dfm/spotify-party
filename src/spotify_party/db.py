@@ -12,7 +12,6 @@ from typing import (
     Mapping,
     MutableMapping,
     Optional,
-    Tuple,
     Union,
 )
 
@@ -477,3 +476,20 @@ class Database:
                 "SELECT * FROM users WHERE listening_to=?", (room_id,)
             ) as cursor:
                 return [User.from_row(self, row) async for row in cursor]
+
+    async def get_room_stats(self) -> Iterable:
+        async with aiosqlite.connect(self.filename) as conn:
+            async with conn.execute(
+                """
+                SELECT
+                    main.user_id,
+                    main.display_name,
+                    main.playing_to,
+                    count(other.user_id)
+                FROM users AS main
+                LEFT JOIN users AS other ON
+                    main.playing_to = other.listening_to
+                WHERE main.playing_to IS NOT NULL
+                """
+            ) as cursor:
+                return await cursor.fetchall()

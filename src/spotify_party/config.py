@@ -4,13 +4,14 @@ from typing import Any, Mapping, MutableMapping
 
 import toml
 
-schema = dict(
+schema: Mapping[str, Any] = dict(
     spotify_client_id=(str, None),
     spotify_client_secret=(str, None),
     spotify_redirect_uri=(str, None),
     base_url=(str, None),
     database_filename=(str, None),
     port=(int, 5000),
+    admins=(list, []),
 )
 
 

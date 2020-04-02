@@ -1,0 +1,19 @@
+{% extends "layout.html" %}
+<!--  -->
+{% block extrahead %}
+<link rel="stylesheet" href="{{ static('splash.css') }}" />
+{% endblock %}
+<!--  -->
+{% block body %}
+<main role="main" class="inner cover">
+  <p>
+    {% for stat in stats %} {% if stat[0] %}
+    <li>
+      <a href="{{ url('admin.room', room_id=stat[2]) }}"
+        >{{ stat[1] }} ({{ stat[0] }}): {{ stat[3] }}</a
+      >
+    </li>
+    {% endif %} {% endfor %}
+  </p>
+</main>
+{% endblock %}

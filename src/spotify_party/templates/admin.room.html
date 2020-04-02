@@ -1,0 +1,20 @@
+{% extends "layout.html" %}
+<!--  -->
+{% block extrahead %}
+<link rel="stylesheet" href="{{ static('splash.css') }}" />
+{% endblock %}
+<!--  -->
+{% block body %}
+<main role="main" class="inner cover">
+  <p class="lead">
+    {{ room.host.display_name }} ({{ room.host.user_id }})
+  </p>
+  <p>
+    {% for user in listeners %}
+    <li>
+      {{ user.display_name }} ({{ user.user_id }})
+    </li>
+    {% endfor %}
+  </p>
+</main>
+{% endblock %}
