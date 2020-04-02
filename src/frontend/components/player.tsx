@@ -55,9 +55,7 @@ export class SpotifyPlayer extends React.Component<
     this.isPaused = true;
     this.state = {
       isPlaying: false,
-      streamUrl: null,
       roomId: props.roomId,
-      deviceId: null,
       whatsNext: 0,
       listeners: 0
     };
@@ -65,21 +63,23 @@ export class SpotifyPlayer extends React.Component<
     // Initialize the socket
     this.socket = io.connect();
     this.socket.on("listeners", (data: any) => {
-      console.log(data);
       self.setState({ listeners: data.number });
     });
     this.socket.on("changed", (data: any) => {
-      console.log(data);
       self.setState({ listeners: data.number, nowPlaying: data.playing });
     });
     this.socket.on("close", () => {
-      console.log("closing");
       self.setState({
         isPlaying: false,
         whatsNext: 1,
         listeners: 0,
         nowPlaying: null
       });
+    });
+
+    // Shutdown
+    window.addEventListener("beforeunload", () => {
+      if (self.state.isPlaying) navigator.sendBeacon("/stop");
     });
 
     // Initialize the player
@@ -95,14 +95,15 @@ export class SpotifyPlayer extends React.Component<
     });
 
     this.player.addListener("player_state_changed", state => {
-      console.log("player_state_changed", state);
-
       if (self.props.isListener || !self.state.isPlaying) {
         return;
       }
 
       if (!state) {
-        self.stop();
+        // self.stop();
+        if (self.state.isPlaying) {
+          self.setState({ isPlaying: false, whatsNext: 3 });
+        }
         return;
       }
 
@@ -150,7 +151,6 @@ export class SpotifyPlayer extends React.Component<
 
   start() {
     if (this.props.isListener) return;
-    console.log("starting broadcast");
     if (!this.state.deviceId) return;
     this.setState({ whatsNext: 0 });
     const self = this;
@@ -158,7 +158,6 @@ export class SpotifyPlayer extends React.Component<
       this.state.deviceId,
       this.state.roomId,
       (roomId: string, streamUrl: string, playing?: TrackInfo) => {
-        console.log("started broadcast");
         self.socket.emit("join", roomId);
         self.setState({
           isPlaying: true,
@@ -173,11 +172,9 @@ export class SpotifyPlayer extends React.Component<
 
   stop() {
     if (this.props.isListener) return;
-    console.log("stopping broadcast");
     this.setState({ whatsNext: 0 });
     const self = this;
     this.props.controller.close(() => {
-      console.log("stopped broadcast");
       self.socket.emit("leave", self.state.roomId);
       self.setState({
         isPlaying: false,
@@ -190,7 +187,6 @@ export class SpotifyPlayer extends React.Component<
 
   listen() {
     if (!this.props.isListener) return;
-    console.log("starting to listen");
     if (!this.state.deviceId) return;
     this.setState({ whatsNext: 0 });
     const self = this;
@@ -198,7 +194,6 @@ export class SpotifyPlayer extends React.Component<
       this.state.deviceId,
       this.props.roomId,
       (listeners: number, nowPlaying: TrackInfo) => {
-        console.log("started listening");
         self.socket.emit("join", self.props.roomId);
         self.setState({
           isPlaying: true,
@@ -212,11 +207,9 @@ export class SpotifyPlayer extends React.Component<
 
   pause() {
     if (!this.props.isListener) return;
-    console.log("stopping listening");
     this.setState({ whatsNext: 0 });
     const self = this;
     this.props.controller.pause(() => {
-      console.log("stopped listening");
       self.socket.emit("leave", self.props.roomId);
       self.setState({
         isPlaying: false,
@@ -228,13 +221,18 @@ export class SpotifyPlayer extends React.Component<
   }
 
   sync() {
-    console.log("syncing");
     this.setState({ whatsNext: 0 });
     const self = this;
     this.props.controller.sync(this.state.deviceId, data => {
-      console.log(data);
-      console.log("finished syncing");
       self.setState({ whatsNext: 2, nowPlaying: data });
+    });
+  }
+
+  transfer() {
+    this.setState({ whatsNext: 0 });
+    const self = this;
+    this.props.controller.transfer(this.state.deviceId, () => {
+      self.setState({ whatsNext: 2 });
     });
   }
 
@@ -261,6 +259,15 @@ export class SpotifyPlayer extends React.Component<
       button2 = <StreamLink streamUrl={this.state.streamUrl} />;
     }
 
+    const error = (
+      <span>
+        <strong>Error:</strong> Your Spotify account got disconnected.{" "}
+        <a href="#" onClick={() => this.transfer()}>
+          Click here to reconnect.
+        </a>
+      </span>
+    );
+
     return (
       <div>
         <NowPlaying
@@ -275,7 +282,7 @@ export class SpotifyPlayer extends React.Component<
           />
           {button2}
         </p>
-        <p>{whatsNext}</p>
+        <p>{whatsNext ? whatsNext : error}</p>
       </div>
     );
   }

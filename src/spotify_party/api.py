@@ -78,7 +78,7 @@ async def handle_auth(request: web.Request, auth: SpotifyAuth) -> None:
 
     if user_info.get("product", "free") != "premium":
         raise web.HTTPTemporaryRedirect(
-            location=request.app.router["premium"].url_for()
+            location=request.app["main_app"].router["premium"].url_for()
         )
 
     user = await main_app["db"].add_user(

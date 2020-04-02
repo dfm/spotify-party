@@ -21,40 +21,21 @@ async def connect(sid: str, environ: Mapping[str, Any]) -> bool:
     user = await request.app["db"].get_user(session.get("sp_user_id"))
     if user is None:
         return False
-
-    # # Disconnect any old sockets
-    # old_sid = session.get("sp_socket_id")
-    # if old_sid is not None:
-    #     print(f"disconnect {old_sid}")
-    #     await sio.disconnect(old_sid)
-
-    # # Save the new socket id
-    # session["sp_socket_id"] = sid
-    print(f"connect {sid}")
     return True
 
 
 @sio.event
 async def disconnect(sid: str) -> None:
-    # # If the stored socket ID is the same as this one, remove it
-    # request = sio.environ[sid]["aiohttp.request"]
-    # session = await aiohttp_session.get_session(request)
-    # old_sid = session.get("sp_socket_id")
-    # if sid == old_sid:
-    #     del session["sp_socket_id"]
-
-    print(f"disconnect {sid}")
+    pass
 
 
 @sio.event
 async def join(sid: str, room_id: str) -> None:
-    print("join")
     sio.enter_room(sid, room_id)
 
 
 @sio.event
 async def leave(sid: str, room_id: str) -> None:
-    print("leave")
     sio.leave_room(sid, room_id)
 
 
@@ -75,6 +56,48 @@ async def me(request: web.Request, user: db.User) -> web.Response:
 @api.require_auth(redirect=False)
 async def token(request: web.Request, user: db.User) -> web.Response:
     return web.json_response({"token": user.auth.access_token})
+
+
+@routes.put("/api/transfer", name="interface.transfer")
+@api.require_auth(redirect=False)
+async def transfer(request: web.Request, user: db.User) -> web.Response:
+    data = await request.json()
+
+    # A device ID is required
+    device_id = data.get("device_id", None)
+    if device_id is None:
+        return web.json_response({"error": "Missing device_id"}, status=400)
+
+    await user.set_device_id(device_id)
+    if not await user.transfer(request, play=True, check=True):
+        return web.json_response({"error": "Unable to transfer"}, status=404)
+
+    return web.json_response({"token": user.auth.access_token})
+
+
+@routes.route("*", "/stop", name="stop")
+@api.require_auth(redirect=False)
+async def stop(request: web.Request, user: db.User) -> web.Response:
+    playing_to = await user.playing_to
+    if playing_to is not None:
+        await playing_to.pause(request)
+        await request.app["db"].close_room(playing_to.room_id)
+        await sio.emit("close", room=playing_to.room_id)
+        return web.Response(body="stopped")
+
+    listening_to = await user.listening_to
+    if listening_to is not None:
+        await user.stop(request)
+        await sio.emit(
+            "listeners",
+            {"number": len(await listening_to.listeners)},
+            room=listening_to.room_id,
+        )
+        return web.Response(body="stopped")
+
+    return web.HTTPTemporaryRedirect(
+        location=request.app.router["index"].url_for()
+    )
 
 
 #
@@ -103,7 +126,6 @@ async def stream(request: web.Request, user: db.User) -> web.Response:
     url = yarl.URL(request.app["config"]["base_url"]).with_path(
         f"/listen/{room_id}"
     )
-    print(url)
     response: Dict[str, Any] = {"room_id": room_id, "stream_url": str(url)}
 
     current = await user.currently_playing(request)
@@ -133,7 +155,6 @@ async def close(request: web.Request, user: db.User) -> web.Response:
 @api.require_auth(redirect=False)
 async def change(request: web.Request, user: db.User) -> web.Response:
     data = await request.json()
-    print(data)
 
     uri = data.get("uri", None)
     if uri is None:
@@ -220,33 +241,3 @@ async def sync(request: web.Request, user: db.User) -> web.Response:
             {"error": "Unable to sync playback"}, status=404
         )
     return web.json_response(data)
-
-
-#
-# Stop all playback
-#
-
-
-@routes.route("*", "/stop", name="stop")
-@api.require_auth(redirect=False)
-async def stop(request: web.Request, user: db.User) -> web.Response:
-    playing_to = await user.playing_to
-    if playing_to is not None:
-        await playing_to.pause(request)
-        await request.app["db"].close_room(playing_to.room_id)
-        await sio.emit("close", room=playing_to.room_id)
-        return web.Response(body="stopped")
-
-    listening_to = await user.listening_to
-    if listening_to is not None:
-        await user.stop(request)
-        await sio.emit(
-            "listeners",
-            {"number": len(await listening_to.listeners)},
-            room=listening_to.room_id,
-        )
-        return web.Response(body="stopped")
-
-    return web.HTTPTemporaryRedirect(
-        location=request.app.router["index"].url_for()
-    )

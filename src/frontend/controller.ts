@@ -86,4 +86,16 @@ export class Controller {
     if (callback) req.then(data => callback(data));
     req.catch(error => console.log(`couldn't sync: ${error}`));
   }
+
+  transfer(deviceId: string, callback?: () => void) {
+    const req = fetch("/api/transfer", {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({ device_id: deviceId })
+    });
+    if (callback) req.then(() => callback());
+    req.catch(error => console.log(`couldn't transfer: ${error}`));
+  }
 }

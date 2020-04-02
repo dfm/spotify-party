@@ -248,6 +248,7 @@ class User:
 
         await self.stop(request)
 
+        await self.transfer(request)
         flag = await self.play(request, {})
         if not flag:
             return None

@@ -6,7 +6,4 @@ import { Controller } from "./controller";
 window.onSpotifyWebPlaybackSDKReady = () => {
   const controller = new Controller();
   renderPlayer(controller, document.getElementById("player"));
-  window.addEventListener("beforeunload", () => {
-    navigator.sendBeacon("/stop");
-  });
 };
