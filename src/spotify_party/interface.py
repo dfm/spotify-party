@@ -9,7 +9,7 @@ from aiohttp import web
 from . import api, db
 
 routes = web.RouteTableDef()
-sio = socketio.AsyncServer(async_mode="aiohttp")
+sio = socketio.AsyncServer(async_mode="aiohttp", cors_allowed_origins="*")
 
 
 @sio.event
