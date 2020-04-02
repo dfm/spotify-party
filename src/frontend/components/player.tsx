@@ -78,8 +78,12 @@ export class SpotifyPlayer extends React.Component<
     });
 
     // Shutdown
-    window.addEventListener("beforeunload", () => {
-      if (self.state.isPlaying) navigator.sendBeacon("/stop");
+    window.addEventListener("beforeunload", event => {
+      if (self.state.isPlaying) {
+        event.preventDefault();
+        navigator.sendBeacon("/stop");
+        return "Are you sure you want to stop listening?";
+      }
     });
 
     // Initialize the player
