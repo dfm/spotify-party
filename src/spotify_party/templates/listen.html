@@ -3,16 +3,24 @@
 {%- block title -%}Distance: Listening{%- endblock -%}
 <!--  -->
 {% block extrahead %}
-<link rel="stylesheet" href="{{ static('listen.css') }}" />
+<link rel="stylesheet" href="{{ static('bundle.css') }}" />
 {% endblock %}
 <!--  -->
 {% block body %}
 <main role="main" class="inner cover">
-  <div id="player" class="lead"></div>
+  <div id="app" class="lead"></div>
 </main>
 {% endblock %}
 <!--  -->
 {% block scripts %}
 <script src="https://sdk.scdn.co/spotify-player.js"></script>
-<script src="{{ static('listen.js') }}"></script>
+<script src="{{ static('bundle.js') }}"></script>
+<script>
+  window.onSpotifyWebPlaybackSDKReady = () => {
+    SpotifyPartyApp.renderListener(
+      "{{ room_id }}",
+      document.getElementById("app")
+    );
+  };
+</script>
 {% endblock %}

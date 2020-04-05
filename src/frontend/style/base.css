@@ -87,3 +87,8 @@ body {
 .mastfoot a:hover {
   color: #333;
 }
+
+.alert .retry {
+  text-decoration: underline;
+  cursor: pointer;
+}

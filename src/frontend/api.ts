@@ -1,18 +1,42 @@
-export interface TrackInfo {
-  uri: string;
-  name: string;
-  type: string;
-  id: string;
-  position_ms?: number;
+import { TrackInfo } from "./types";
+
+interface CallOptions {
+  data?: any;
+  callback?: (data?: any) => void;
+  error?: (message?: string) => void;
 }
 
-export class Controller {
-  token(callback: (token: string) => void) {
-    fetch("/api/token", { method: "POST" })
+interface APIArgs {
+  method: string;
+  headers: { "Content-Type": string };
+  body?: string;
+}
+
+export class API {
+  call(endpoint: string, options?: CallOptions) {
+    let args: APIArgs = {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      }
+    };
+    if (options?.data) args.body = JSON.stringify(options.data);
+    fetch(endpoint, args)
       .then(response => response.json())
-      .then(data => callback(data.token))
-      .catch(error => console.log(`couldn't get token: ${error}`));
+      .then(data => {
+        if (data.error && options?.error) options.error(data.error);
+        else if (options?.callback) options.callback(data);
+      })
+      .catch(error =>
+        console.error(`call to '${endpoint}' failed with error: ${error})`)
+      );
   }
+
+  getToken(callback: (token: string) => void) {
+    this.call("/api/token", { callback: data => callback(data.token) });
+  }
+
+  startBroadcast(device_id: string, room_id?: string) {}
 
   stream(
     device_id: string,

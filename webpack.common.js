@@ -8,8 +8,8 @@ const OptimizeCSSAssetsPlugin = require("optimize-css-assets-webpack-plugin");
 module.exports = {
   entry: {
     splash: "./src/frontend/splash.ts",
-    play: "./src/frontend/play.ts",
-    listen: "./src/frontend/listen.ts"
+    bundle: "./src/frontend/bundle.ts"
+    // listen: "./src/frontend/listen.ts"
   },
   optimization: {
     minimizer: [new TerserJSPlugin({}), new OptimizeCSSAssetsPlugin({})]
@@ -37,6 +37,7 @@ module.exports = {
     extensions: [".tsx", ".ts", ".js"]
   },
   output: {
+    library: "SpotifyPartyApp",
     filename: "[name].js",
     path: path.resolve(__dirname, "./src/spotify_party/assets"),
     publicPath: "/assets"

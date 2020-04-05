@@ -2,7 +2,6 @@ __all__ = ["create_tables", "User", "Room", "Database"]
 
 import asyncio
 import pathlib
-import secrets
 import sqlite3
 from typing import (
     Any,
@@ -21,6 +20,7 @@ from aiohttp import ClientResponseError, web
 from aiohttp_spotify import SpotifyAuth
 
 from . import api
+from .generate_room_name import generate_room_name
 
 DEFAULT_RETRIES = 3
 
@@ -124,15 +124,6 @@ class User:
         except ClientResponseError as e:
             if e.status not in (403, 404):
                 raise
-
-            # if not transfer:
-            #     return False
-
-            # flag = await self.transfer(request, check=False)
-            # if flag and retries > 0:
-            #     await asyncio.sleep(1)
-            #     return await self.pause(request, retries=retries - 1)
-
             return False
 
         return True
@@ -180,7 +171,7 @@ class User:
         response = await api.call_api(
             request, self, "/me/player/currently-playing"
         )
-        if response is None:
+        if response is None or response.status == 204:
             return None
         data = response.json()
         item = data.get("item", {})
@@ -439,7 +430,7 @@ class Database:
 
     async def add_room(self, host: User, room_id: Optional[str] = None) -> str:
         if room_id is None:
-            room_id = secrets.token_urlsafe()
+            room_id = generate_room_name()
         async with aiosqlite.connect(self.filename) as conn:
             await conn.execute(
                 "UPDATE users SET playing_to=?, paused=0 WHERE user_id=?",

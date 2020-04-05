@@ -21,6 +21,13 @@ async def connect(sid: str, environ: Mapping[str, Any]) -> bool:
     user = await request.app["db"].get_user(session.get("sp_user_id"))
     if user is None:
         return False
+
+    # Re-join the correct room if this is a re-connect
+    if user.listening_to_id is not None:
+        sio.enter_room(sid, user.listening_to_id)
+    elif user.playing_to_id is not None:
+        sio.enter_room(sid, user.playing_to_id)
+
     return True
 
 
@@ -58,7 +65,7 @@ async def token(request: web.Request, user: db.User) -> web.Response:
     return web.json_response({"token": user.auth.access_token})
 
 
-@routes.put("/api/transfer", name="interface.transfer")
+@routes.post("/api/transfer", name="interface.transfer")
 @api.require_auth(redirect=False)
 async def transfer(request: web.Request, user: db.User) -> web.Response:
     data = await request.json()
@@ -72,12 +79,15 @@ async def transfer(request: web.Request, user: db.User) -> web.Response:
     if not await user.transfer(request, play=True, check=True):
         return web.json_response({"error": "Unable to transfer"}, status=404)
 
-    return web.json_response({"token": user.auth.access_token})
+    return web.json_response(
+        {"playing": await user.currently_playing(request)}
+    )
 
 
 @routes.route("*", "/stop", name="stop")
 @api.require_auth(redirect=False)
 async def stop(request: web.Request, user: db.User) -> web.Response:
+    print("stopped!")
     playing_to = await user.playing_to
     if playing_to is not None:
         await playing_to.pause(request)
@@ -105,9 +115,9 @@ async def stop(request: web.Request, user: db.User) -> web.Response:
 #
 
 
-@routes.put("/api/stream", name="interface.stream")
+@routes.post("/api/broadcast/start", name="broadcast.start")
 @api.require_auth(redirect=False)
-async def stream(request: web.Request, user: db.User) -> web.Response:
+async def broadcast_start(request: web.Request, user: db.User) -> web.Response:
     data = await request.json()
 
     # A device ID is required
@@ -135,9 +145,9 @@ async def stream(request: web.Request, user: db.User) -> web.Response:
     return web.json_response(response)
 
 
-@routes.put("/api/close", name="interface.close")
+@routes.post("/api/broadcast/stop", name="broadcast.stop")
 @api.require_auth(redirect=False)
-async def close(request: web.Request, user: db.User) -> web.Response:
+async def broadcast_stop(request: web.Request, user: db.User) -> web.Response:
     room = await user.playing_to
 
     if not await user.stop(request):
@@ -148,12 +158,27 @@ async def close(request: web.Request, user: db.User) -> web.Response:
     if room is not None:
         await sio.emit("close", room=room.room_id)
 
-    return web.HTTPNoContent()
+    return web.json_response({})
 
 
-@routes.put("/api/change", name="interface.change")
+@routes.post("/api/broadcast/pause", name="broadcast.pause")
 @api.require_auth(redirect=False)
-async def change(request: web.Request, user: db.User) -> web.Response:
+async def broadcast_pause(request: web.Request, user: db.User) -> web.Response:
+    room = await user.playing_to
+    if room is None:
+        return web.json_response({"error": "User is not playing"})
+
+    if not await room.pause(request):
+        return web.json_response({"error": "Unable to pause room"})
+
+    return web.json_response({})
+
+
+@routes.post("/api/broadcast/change", name="broadcast.change")
+@api.require_auth(redirect=False)
+async def broadcast_change(
+    request: web.Request, user: db.User
+) -> web.Response:
     data = await request.json()
 
     uri = data.get("uri", None)
@@ -173,7 +198,7 @@ async def change(request: web.Request, user: db.User) -> web.Response:
         room=room.room_id,
     )
 
-    return web.HTTPNoContent()
+    return web.json_response({})
 
 
 #
@@ -181,9 +206,9 @@ async def change(request: web.Request, user: db.User) -> web.Response:
 #
 
 
-@routes.put("/api/listen", name="interface.listen")
+@routes.post("/api/listen/start", name="listen.start")
 @api.require_auth(redirect=False)
-async def listen(request: web.Request, user: db.User) -> web.Response:
+async def listen_start(request: web.Request, user: db.User) -> web.Response:
     data = await request.json()
 
     # A device ID is required
@@ -207,37 +232,42 @@ async def listen(request: web.Request, user: db.User) -> web.Response:
     return web.json_response(data)
 
 
-@routes.put("/api/pause", name="interface.pause")
+@routes.post("/api/listen/stop", name="listen.stop")
 @api.require_auth(redirect=False)
-async def pause(request: web.Request, user: db.User) -> web.Response:
-    room = await user.playing_to
-    if room is None:
-        room = await user.listening_to
+async def listen_stop(request: web.Request, user: db.User) -> web.Response:
+    if user.playing_to_id is not None or user.listening_to_id is None:
+        return web.json_response({"error": "User is not listening"})
 
-        if not await user.stop(request):
-            return web.json_response({"error": "Unable to pause"})
+    room = await user.listening_to
+    if not await user.stop(request):
+        return web.json_response({"error": "Unable to pause"})
 
-        if room is not None:
-            await sio.emit(
-                "listeners",
-                {"number": len(await room.listeners)},
-                room=room.room_id,
-            )
+    if room is not None:
+        await sio.emit(
+            "listeners",
+            {"number": len(await room.listeners)},
+            room=room.room_id,
+        )
 
-        return web.HTTPNoContent()
-
-    if not await room.pause(request):
-        return web.json_response({"error": "Unable to pause room"})
-
-    return web.HTTPNoContent()
+    return web.json_response({})
 
 
-@routes.put("/api/sync", name="interface.sync")
+@routes.post("/api/listen/sync", name="listen.sync")
 @api.require_auth(redirect=False)
-async def sync(request: web.Request, user: db.User) -> web.Response:
+async def listen_sync(request: web.Request, user: db.User) -> web.Response:
+    data = await request.json()
+
+    # A device ID is required
+    device_id = data.get("device_id", None)
+    if device_id is None:
+        return web.json_response({"error": "Missing device_id"}, status=400)
+
+    await user.set_device_id(device_id)
     data = await user.sync(request)
     if data is None:
         return web.json_response(
             {"error": "Unable to sync playback"}, status=404
         )
+
+    print(data)
     return web.json_response(data)

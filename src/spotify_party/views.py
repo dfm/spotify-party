@@ -5,6 +5,7 @@ import aiohttp_session
 from aiohttp import web
 
 from . import api, db
+from .generate_room_name import generate_room_name
 
 routes = web.RouteTableDef()
 
@@ -55,7 +56,13 @@ async def logout(request: web.Request) -> web.Response:
 @api.require_auth
 async def play(request: web.Request, user: db.User) -> web.Response:
     return aiohttp_jinja2.render_template(
-        "play.html", request, {"is_logged_in": True, "current_page": "play"}
+        "play.html",
+        request,
+        {
+            "is_logged_in": True,
+            "current_page": "play",
+            "room_id": generate_room_name(),
+        },
     )
 
 
@@ -73,7 +80,9 @@ async def listen(request: web.Request, user: db.User) -> web.Response:
         )
 
     return aiohttp_jinja2.render_template(
-        "listen.html", request, {"is_logged_in": True}
+        "listen.html",
+        request,
+        {"is_logged_in": True, "room_id": request.match_info["room_id"]},
     )
 
 
