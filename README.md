@@ -28,14 +28,20 @@ Install node and yarn:
 
 Install the node environment:
 
-```
+```bash
 yarn
 ```
 
-Then build the assets:
+Then build the assets for development:
 
+```bash
+yarn dev
 ```
-yarn build
+
+or production:
+
+```bash
+yarn prod
 ```
 
 ## Run the development server
