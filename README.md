@@ -46,10 +46,16 @@ yarn prod
 
 ## Run the development server
 
-Edit the configuration file (there is an example in `config/template.toml`) then run:
+Edit the configuration file (there is an example in `config/template.toml`) then create the database:
 
 ```bash
-venv/bin/python -m spotify_party path/to/config.toml
+venv/bin/python -m spotify_party /path/to/your/config.toml --create-tables
+```
+
+and run the server:
+
+```bash
+venv/bin/python -m spotify_party /path/to/your/config.toml
 ```
 
 Then navigate to http://localhost:5000 or similar.
