@@ -22,7 +22,6 @@ dub
 dubstep
 emo
 flamenco
-folk
 funk
 fusion
 glitch
@@ -58,7 +57,6 @@ screamo
 shoegaze
 singer-songwriter
 ska
-soil
 swing
 synth
 synthwave

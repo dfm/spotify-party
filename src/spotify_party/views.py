@@ -1,10 +1,12 @@
 __all__ = ["routes"]
 
+from typing import Awaitable, Callable
+
 import aiohttp_jinja2
 import aiohttp_session
 from aiohttp import web
 
-from . import api, db
+from . import api, db, interface
 from .generate_room_name import generate_room_name
 
 routes = web.RouteTableDef()
@@ -22,7 +24,9 @@ async def index(request: web.Request) -> web.Response:
 
 @routes.get("/about", name="about")
 async def about(request: web.Request) -> web.Response:
-    return aiohttp_jinja2.render_template("about.html", request, {})
+    return aiohttp_jinja2.render_template(
+        "about.html", request, {"current_page": "about"}
+    )
 
 
 @routes.get("/premium", name="premium")
@@ -55,23 +59,41 @@ async def logout(request: web.Request) -> web.Response:
 @routes.get("/play", name="play")
 @api.require_auth
 async def play(request: web.Request, user: db.User) -> web.Response:
+    # We'll reuse the same room id if the user is already playing
+    room_id = user.playing_to_id
+
+    # Stop the user's current playback
+    await user.stop(request)
+
+    # Generate a new room name or close the old one
+    if room_id is None:
+        room_name = generate_room_name()
+    else:
+        await interface.sio.emit("close", room=room_id)
+        room_name = room_id.split("/")[1]
+
     return aiohttp_jinja2.render_template(
         "play.html",
         request,
         {
             "is_logged_in": True,
             "current_page": "play",
-            "room_id": generate_room_name(),
+            "user_id": user.user_id,
+            "room_name": room_name,
         },
     )
 
 
-@routes.get("/listen/{room_id}", name="listen")
+@routes.get("/listen/{user_id}/{room_name}", name="listen")
 @api.require_auth
 async def listen(request: web.Request, user: db.User) -> web.Response:
-    room = await request.app["db"].get_room(request.match_info["room_id"])
+    room_id = (
+        f"{request.match_info['user_id']}/{request.match_info['room_name']}"
+    )
+
+    room = await request.app["db"].get_room(room_id)
     if room is None:
-        raise web.HTTPNotFound()
+        return aiohttp_jinja2.render_template("notfound.html", request, {})
 
     # Is the current user the host?
     if room.host_id == user.user_id:
@@ -79,10 +101,11 @@ async def listen(request: web.Request, user: db.User) -> web.Response:
             location=request.app.router["play"].url_for()
         )
 
+    user_id, room_name = room_id.split("/")
     return aiohttp_jinja2.render_template(
         "listen.html",
         request,
-        {"is_logged_in": True, "room_id": request.match_info["room_id"]},
+        {"is_logged_in": True, "user_id": user_id, "room_name": room_name},
     )
 
 
@@ -110,4 +133,27 @@ async def admin_room(request: web.Request, user: db.User) -> web.Response:
         "admin.room.html",
         request,
         {"room": room, "listeners": await room.listeners},
+    )
+
+
+#
+# Error handler
+#
+
+
+@web.middleware
+async def error_middleware(
+    request: web.Request, handler: Callable[[web.Request], Awaitable]
+) -> web.Response:
+    try:
+        response = await handler(request)
+        if response.status < 400:
+            return response
+        error_code = response.status
+    except web.HTTPException as ex:
+        error_code = ex.status
+        if error_code < 400:
+            raise
+    return aiohttp_jinja2.render_template(
+        "error.html", request, {"error_code": error_code}
     )

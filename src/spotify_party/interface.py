@@ -73,11 +73,11 @@ async def transfer(request: web.Request, user: db.User) -> web.Response:
     # A device ID is required
     device_id = data.get("device_id", None)
     if device_id is None:
-        return web.json_response({"error": "Missing device_id"}, status=400)
+        return web.json_response({"error": "Missing device_id"})
 
     await user.set_device_id(device_id)
     if not await user.transfer(request, play=True, check=True):
-        return web.json_response({"error": "Unable to transfer"}, status=404)
+        return web.json_response({"error": "Unable to transfer"})
 
     return web.json_response(
         {"playing": await user.currently_playing(request)}
@@ -87,7 +87,6 @@ async def transfer(request: web.Request, user: db.User) -> web.Response:
 @routes.route("*", "/stop", name="stop")
 @api.require_auth(redirect=False)
 async def stop(request: web.Request, user: db.User) -> web.Response:
-    print("stopped!")
     playing_to = await user.playing_to
     if playing_to is not None:
         await playing_to.pause(request)
@@ -123,15 +122,15 @@ async def broadcast_start(request: web.Request, user: db.User) -> web.Response:
     # A device ID is required
     device_id = data.get("device_id", None)
     if device_id is None:
-        return web.json_response({"error": "Missing device_id"}, status=400)
+        return web.json_response({"error": "Missing device_id"})
 
-    room_id = await user.play_to(
-        request, device_id, room_id=data.get("room_id", None)
-    )
+    room_name = data.get("room_name", None)
+    if room_name is None:
+        return web.json_response({"error": "Missing room_name"})
+
+    room_id = await user.play_to(request, device_id, room_name=room_name)
     if room_id is None:
-        return web.json_response(
-            {"error": "Unable to transfer device"}, status=404
-        )
+        return web.json_response({"error": "Unable to transfer device"})
 
     url = yarl.URL(request.app["config"]["base_url"]).with_path(
         f"/listen/{room_id}"
@@ -151,9 +150,7 @@ async def broadcast_stop(request: web.Request, user: db.User) -> web.Response:
     room = await user.playing_to
 
     if not await user.stop(request):
-        return web.json_response(
-            {"error": "Unable to stop playing"}, status=404
-        )
+        return web.json_response({"error": "Unable to stop playing"})
 
     if room is not None:
         await sio.emit("close", room=room.room_id)
@@ -183,11 +180,11 @@ async def broadcast_change(
 
     uri = data.get("uri", None)
     if uri is None:
-        return web.json_response({"error": "Missing uri"}, status=400)
+        return web.json_response({"error": "Missing uri"})
 
     room = await user.playing_to
     if room is None:
-        return web.json_response({"error": "User not playing"}, status=403)
+        return web.json_response({"error": "User not playing"})
 
     if not await room.play(request, uri, data.get("position_ms", None)):
         return web.json_response({"error": "Unable to change song"})
@@ -214,12 +211,12 @@ async def listen_start(request: web.Request, user: db.User) -> web.Response:
     # A device ID is required
     device_id = data.get("device_id", None)
     if device_id is None:
-        return web.json_response({"error": "Missing device_id"}, status=400)
+        return web.json_response({"error": "Missing device_id"})
 
     # Make sure that the room exists
     room = await request.app["db"].get_room(data.get("room_id", None))
     if room is None:
-        return web.json_response({"error": "Invalid room_id"}, status=404)
+        return web.json_response({"error": "Invalid room_id"})
 
     data = await user.listen_to(request, room, device_id=device_id)
     if data is None:
@@ -236,7 +233,7 @@ async def listen_start(request: web.Request, user: db.User) -> web.Response:
 @api.require_auth(redirect=False)
 async def listen_stop(request: web.Request, user: db.User) -> web.Response:
     if user.playing_to_id is not None or user.listening_to_id is None:
-        return web.json_response({"error": "User is not listening"})
+        return web.json_response({})
 
     room = await user.listening_to
     if not await user.stop(request):
@@ -260,14 +257,11 @@ async def listen_sync(request: web.Request, user: db.User) -> web.Response:
     # A device ID is required
     device_id = data.get("device_id", None)
     if device_id is None:
-        return web.json_response({"error": "Missing device_id"}, status=400)
+        return web.json_response({"error": "Missing device_id"})
 
     await user.set_device_id(device_id)
     data = await user.sync(request)
     if data is None:
-        return web.json_response(
-            {"error": "Unable to sync playback"}, status=404
-        )
+        return web.json_response({"error": "Unable to sync playback"})
 
-    print(data)
     return web.json_response(data)

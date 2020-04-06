@@ -30,7 +30,7 @@ async def client_session(app: web.Application) -> AsyncIterator[None]:
 
 
 def app_factory(config: Mapping[str, Any]) -> web.Application:
-    app = web.Application()
+    app = web.Application(middlewares=[views.error_middleware])
 
     # load the configuration file
     app["config"] = config

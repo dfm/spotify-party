@@ -17,13 +17,14 @@ import { ErrorMessage } from "./components/error-message";
 
 interface AppProps {
   isListener: boolean;
-  initialRoomId: string;
+  userId: string;
+  initialRoomName: string;
 }
 
 interface AppState {
   status: Status;
   isPaused: boolean;
-  roomId: string;
+  roomName: string;
   listeners: number;
   deviceId?: string;
   currentTrack?: TrackInfo;
@@ -47,7 +48,7 @@ class App extends React.Component<AppProps, AppState> {
     this.state = {
       status: Status.Loading,
       isPaused: true,
-      roomId: this.props.initialRoomId,
+      roomName: this.props.initialRoomName,
       listeners: 0
     };
 
@@ -201,6 +202,10 @@ class App extends React.Component<AppProps, AppState> {
     }
   }
 
+  getRoomId() {
+    return `${this.props.userId}/${this.state.roomName}`;
+  }
+
   startBroadcast() {
     if (this.state.status < Status.Ready || !this.state.deviceId) {
       this.setState({
@@ -215,12 +220,11 @@ class App extends React.Component<AppProps, AppState> {
 
     this.setState({ status: Status.Loading });
     this.api.call("/api/broadcast/start", {
-      data: { device_id: this.state.deviceId, room_id: this.state.roomId },
+      data: { device_id: this.state.deviceId, room_name: this.state.roomName },
       callback: response => {
         this.socket.emit("join", response.room_id);
         this.setState({
           status: Status.Streaming,
-          roomId: response.room_id,
           streamUrl: response.stream_url,
           currentTrack: response.playing
         });
@@ -245,7 +249,7 @@ class App extends React.Component<AppProps, AppState> {
     this.setState({ status: Status.Loading });
     this.api.call("/api/broadcast/stop", {
       callback: () => {
-        this.socket.emit("leave", this.state.roomId);
+        this.socket.emit("leave", this.getRoomId());
         this.setState(ReadyState);
       },
       error: message => {
@@ -292,10 +296,10 @@ class App extends React.Component<AppProps, AppState> {
     this.api.call("/api/listen/start", {
       data: {
         device_id: this.state.deviceId,
-        room_id: this.props.initialRoomId
+        room_id: this.getRoomId()
       },
       callback: response => {
-        this.socket.emit("join", this.props.initialRoomId);
+        this.socket.emit("join", this.getRoomId());
         this.setState({
           status: Status.Streaming,
           listeners: response.number,
@@ -318,7 +322,7 @@ class App extends React.Component<AppProps, AppState> {
     this.setState({ status: Status.Loading });
     this.api.call("/api/listen/stop", {
       callback: () => {
-        this.socket.emit("leave", this.props.initialRoomId);
+        this.socket.emit("leave", this.getRoomId());
         this.setState(ReadyState);
       },
       error: message => {
@@ -406,6 +410,21 @@ class App extends React.Component<AppProps, AppState> {
   render() {
     return (
       <div>
+        <small className="channel-label">channel:</small>
+        {this.props.isListener || this.state.status != Status.Ready ? (
+          <div className="room-name">{this.state.roomName}</div>
+        ) : (
+          <input
+            type="text"
+            className="room-name"
+            value={this.state.roomName}
+            onChange={event =>
+              this.setState({
+                roomName: event.target.value.replace(/[\s;,\/\?:@&=\+\$]/g, "-")
+              })
+            }
+          />
+        )}
         <NowPlaying
           listeners={this.state.listeners}
           trackInfo={this.state.currentTrack}
@@ -437,10 +456,24 @@ class App extends React.Component<AppProps, AppState> {
   }
 }
 
-export const renderPlayer = (roomId: string, div: Element) => {
-  ReactDOM.render(<App isListener={false} initialRoomId={roomId} />, div);
+export const renderPlayer = (
+  userId: string,
+  roomName: string,
+  div: Element
+) => {
+  ReactDOM.render(
+    <App isListener={false} userId={userId} initialRoomName={roomName} />,
+    div
+  );
 };
 
-export const renderListener = (roomId: string, div: Element) => {
-  ReactDOM.render(<App isListener={true} initialRoomId={roomId} />, div);
+export const renderListener = (
+  userId: string,
+  roomName: string,
+  div: Element
+) => {
+  ReactDOM.render(
+    <App isListener={true} userId={userId} initialRoomName={roomName} />,
+    div
+  );
 };

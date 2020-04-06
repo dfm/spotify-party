@@ -17,7 +17,11 @@
       <header class="masthead mb-auto">
         <div class="inner">
           <nav class="nav nav-masthead justify-content-center">
-            <a class="nav-link" href="{{ url('about') }}">About</a>
+            <a
+              class="nav-link{% if current_page == 'about' %} active {% endif %}"
+              href="{{ url('about') }}"
+              >About</a
+            >
             <a
               class="nav-link{% if current_page == 'play' %} active {% endif %}"
               href="{{ url('play') }}"

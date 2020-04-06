@@ -18,7 +18,8 @@
 <script>
   window.onSpotifyWebPlaybackSDKReady = () => {
     SpotifyPartyApp.renderPlayer(
-      "{{ room_id }}",
+      "{{ user_id }}",
+      "{{ room_name }}",
       document.getElementById("app")
     );
   };

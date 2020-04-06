@@ -229,11 +229,7 @@ class User:
         return await self.sync(request, retries=retries)
 
     async def play_to(
-        self,
-        request: web.Request,
-        device_id: str,
-        *,
-        room_id: Optional[str] = None,
+        self, request: web.Request, device_id: str, *, room_name: str
     ) -> Optional[str]:
         await self.set_device_id(device_id)
 
@@ -244,10 +240,8 @@ class User:
         if not flag:
             return None
 
-        room = await self.database.get_room(room_id)
-        if room is not None:
-            room_id = None
-        room_id = await self.database.add_room(self, room_id=room_id)
+        room_id = f"{self.user_id}/{room_name}"
+        await self.database.add_room(self, room_id)
 
         self.listening_to_id = None
         self.playing_to_id = room_id
@@ -428,9 +422,7 @@ class Database:
             ) as cursor:
                 return Room.from_row(self, await cursor.fetchone())
 
-    async def add_room(self, host: User, room_id: Optional[str] = None) -> str:
-        if room_id is None:
-            room_id = generate_room_name()
+    async def add_room(self, host: User, room_id: str) -> str:
         async with aiosqlite.connect(self.filename) as conn:
             await conn.execute(
                 "UPDATE users SET playing_to=?, paused=0 WHERE user_id=?",
