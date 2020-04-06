@@ -236,8 +236,7 @@ async def listen_stop(request: web.Request, user: db.User) -> web.Response:
         return web.json_response({})
 
     room = await user.listening_to
-    if not await user.stop(request):
-        return web.json_response({"error": "Unable to pause"})
+    await user.stop(request)
 
     if room is not None:
         await sio.emit(

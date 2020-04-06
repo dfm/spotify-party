@@ -60,6 +60,7 @@ class App extends React.Component<AppProps, AppState> {
     window.addEventListener("beforeunload", event => {
       if (this.state.status == Status.Streaming) {
         event.preventDefault();
+        event.returnValue = "Are you sure?";
         navigator.sendBeacon("/stop");
         this.setState(ReadyState);
         if (this.props.isListener) {
