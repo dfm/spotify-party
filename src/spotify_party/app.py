@@ -11,7 +11,6 @@ import jinja2
 import pkg_resources
 from aiohttp import ClientSession, web
 from aiohttp_session.cookie_storage import EncryptedCookieStorage
-from cryptography import fernet
 
 from . import api, db, interface, views
 
@@ -46,8 +45,12 @@ def app_factory(config: Mapping[str, Any]) -> web.Application:
     app.add_routes(interface.routes)
 
     # Set up the user session for cookies
-    secret_key = base64.urlsafe_b64decode(fernet.Fernet.generate_key())
-    aiohttp_session.setup(app, EncryptedCookieStorage(secret_key))
+    aiohttp_session.setup(
+        app,
+        EncryptedCookieStorage(
+            base64.urlsafe_b64decode(app["config"]["session_key"])
+        ),
+    )
 
     # Set up the templating engine and the static endpoint
     aiohttp_jinja2.setup(

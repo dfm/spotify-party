@@ -123,10 +123,13 @@ async def admin(request: web.Request, user: db.User) -> web.Response:
     )
 
 
-@routes.get("/admin/{room_id}", name="admin.room")
+@routes.get("/admin/{user_id}/{room_name}", name="admin.room")
 @api.require_auth(admin=True)
 async def admin_room(request: web.Request, user: db.User) -> web.Response:
-    room = await request.app["db"].get_room(request.match_info["room_id"])
+    room_id = (
+        f"{request.match_info['user_id']}/{request.match_info['room_name']}"
+    )
+    room = await request.app["db"].get_room(room_id)
     if room is None:
         return web.HTTPNotFound()
     return aiohttp_jinja2.render_template(

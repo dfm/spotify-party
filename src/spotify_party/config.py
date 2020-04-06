@@ -3,6 +3,7 @@ __all__ = ["get_config"]
 from typing import Any, Mapping, MutableMapping
 
 import toml
+from cryptography import fernet
 
 schema: Mapping[str, Any] = dict(
     spotify_client_id=(str, None),
@@ -12,6 +13,7 @@ schema: Mapping[str, Any] = dict(
     database_filename=(str, None),
     port=(int, 5000),
     admins=(list, []),
+    session_key=(str, fernet.Fernet.generate_key().decode("utf-8")),
 )
 
 
