@@ -9,7 +9,8 @@
   <p>
     {% for stat in stats %} {% if stat[0] %}
     <li>
-      <a href="{{ url('admin.room', room_id=stat[2]) }}"
+      <a
+        href="{{ url('admin.room', room_name=stat[2].split('/')[1], user_id=stat[0]) }}"
         >{{ stat[1] }} ({{ stat[0] }}): {{ stat[3] }}</a
       >
     </li>

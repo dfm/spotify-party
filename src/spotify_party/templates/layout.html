@@ -1,7 +1,36 @@
 <!DOCTYPE html>
-<html>
+<html prefix="og: http://ogp.me/ns#">
   <head>
     <title>{%- block title -%}Distance{%- endblock -%}</title>
+
+    <meta
+      name="description"
+      content="Keep listening to music with your friends even from a social distance."
+    />
+
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="Distance" />
+    <meta property="og:url" content="{{ app['config']['base_url'] }}" />
+    <meta
+      property="og:image"
+      content="{{ app['config']['base_url'] }}/assets/icon96.png"
+    />
+    <meta
+      property="og:description"
+      content="Keep listening to music with your friends even from a social distance."
+    />
+
+    <meta name="twitter:card" content="summary" />
+    <meta name="twitter:title" content="Distance" />
+    <meta
+      name="twitter:description"
+      content="Keep listening to music with your friends even from a social distance."
+    />
+    <meta name="twitter:creator" content="@exoplaneteer" />
+
+    <link rel="icon" href="/assets/icon16.png" type="image/png" sizes="16x16" />
+    <link rel="icon" href="/assets/icon32.png" type="image/png" sizes="32x32" />
+    <link rel="icon" href="/assets/icon96.png" type="image/png" sizes="96x96" />
 
     <link
       rel="stylesheet"
@@ -47,7 +76,15 @@
             Please
             <a href="https://github.com/dfm/spotify-party/issues"
               >report issues on GitHub</a
-            >.
+            >.<br />
+            Icon made by
+            <a href="https://www.flaticon.com/authors/freepik" title="Freepik"
+              >Freepik</a
+            >
+            from
+            <a href="https://www.flaticon.com/" title="Flaticon"
+              >www.flaticon.com</a
+            >
           </p>
         </div>
       </footer>

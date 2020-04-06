@@ -4,17 +4,21 @@ const { CleanWebpackPlugin } = require("clean-webpack-plugin");
 
 const TerserJSPlugin = require("terser-webpack-plugin");
 const OptimizeCSSAssetsPlugin = require("optimize-css-assets-webpack-plugin");
+const CopyPlugin = require("copy-webpack-plugin");
 
 module.exports = {
   entry: {
     splash: "./src/frontend/splash.ts",
     bundle: "./src/frontend/bundle.ts"
-    // listen: "./src/frontend/listen.ts"
   },
   optimization: {
     minimizer: [new TerserJSPlugin({}), new OptimizeCSSAssetsPlugin({})]
   },
-  plugins: [new MiniCssExtractPlugin(), new CleanWebpackPlugin()],
+  plugins: [
+    new MiniCssExtractPlugin(),
+    new CleanWebpackPlugin(),
+    new CopyPlugin([{ from: "./src/frontend/img", to: "." }])
+  ],
   module: {
     rules: [
       {
