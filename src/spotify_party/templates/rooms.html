@@ -1,0 +1,21 @@
+{% extends "layout.html" %}
+<!--  -->
+{%- block title -%}Public Streams{%- endblock -%}
+<!--  -->
+{% block extrahead %}
+<link rel="stylesheet" href="{{ static('bundle.css') }}" />
+{% endblock %}
+<!--  -->
+{% block body %}
+<main role="main" class="inner cover">
+  <p>
+    {% if rooms|length > 0 %}
+      {% for room in rooms %}
+        <li><a href="/listen/{{ room[0] }}">{{ room[0] }}</a></li>
+      {% endfor %}
+    {% else %}
+      No public streams are available!
+    {% endif %}
+  </p>
+</main>
+{% endblock %}
