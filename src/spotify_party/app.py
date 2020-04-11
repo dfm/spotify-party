@@ -12,7 +12,7 @@ import pkg_resources
 from aiohttp import ClientSession, web
 from aiohttp_session.cookie_storage import EncryptedCookieStorage
 
-from . import api, db, interface, views
+from . import api, auth, db, views
 
 
 def get_resource_path(path: str) -> pathlib.Path:
@@ -42,7 +42,9 @@ def app_factory(config: Mapping[str, Any]) -> web.Application:
 
     # And the routes for the main app
     app.add_routes(views.routes)
-    app.add_routes(interface.routes)
+
+    # Add the API app
+    app.add_subapp("/api", api.api_app())
 
     # Set up the user session for cookies
     aiohttp_session.setup(
@@ -64,7 +66,7 @@ def app_factory(config: Mapping[str, Any]) -> web.Application:
         client_id=config["spotify_client_id"],
         client_secret=config["spotify_client_secret"],
         redirect_uri=config["spotify_redirect_uri"],
-        handle_auth=api.handle_auth,
+        handle_auth=auth.handle_auth,
         default_redirect=app.router["play"].url_for(),
         scope=[
             "streaming",
@@ -79,6 +81,6 @@ def app_factory(config: Mapping[str, Any]) -> web.Application:
     app.add_subapp("/spotify", app["spotify_app"])
 
     # Attach the socket.io interface
-    interface.sio.attach(app)
+    api.sio.attach(app)
 
     return app

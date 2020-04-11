@@ -6,7 +6,8 @@ import aiohttp_jinja2
 import aiohttp_session
 from aiohttp import web
 
-from . import api, db, interface
+from . import api, db
+from .auth import require_auth
 from .generate_room_name import generate_room_name
 
 routes = web.RouteTableDef()
@@ -57,7 +58,7 @@ async def logout(request: web.Request) -> web.Response:
 
 
 @routes.get("/play", name="play")
-@api.require_auth
+@require_auth
 async def play(request: web.Request, user: db.User) -> web.Response:
     # We'll reuse the same room id if the user is already playing
     room_id = user.playing_to_id
@@ -69,7 +70,7 @@ async def play(request: web.Request, user: db.User) -> web.Response:
     if room_id is None:
         room_name = generate_room_name()
     else:
-        await interface.sio.emit("close", room=room_id)
+        await api.sio.emit("close", room=room_id)
         room_name = room_id.split("/")[1]
 
     return aiohttp_jinja2.render_template(
@@ -85,7 +86,7 @@ async def play(request: web.Request, user: db.User) -> web.Response:
 
 
 @routes.get("/listen/{user_id}/{room_name}", name="listen")
-@api.require_auth
+@require_auth
 async def listen(request: web.Request, user: db.User) -> web.Response:
     room_id = (
         f"{request.match_info['user_id']}/{request.match_info['room_name']}"
@@ -115,7 +116,7 @@ async def listen(request: web.Request, user: db.User) -> web.Response:
 
 
 @routes.get("/admin", name="admin")
-@api.require_auth(admin=True)
+@require_auth(admin=True)
 async def admin(request: web.Request, user: db.User) -> web.Response:
     stats = await request.app["db"].get_room_stats()
     return aiohttp_jinja2.render_template(
@@ -124,7 +125,7 @@ async def admin(request: web.Request, user: db.User) -> web.Response:
 
 
 @routes.get("/admin/{user_id}/{room_name}", name="admin.room")
-@api.require_auth(admin=True)
+@require_auth(admin=True)
 async def admin_room(request: web.Request, user: db.User) -> web.Response:
     room_id = (
         f"{request.match_info['user_id']}/{request.match_info['room_name']}"
