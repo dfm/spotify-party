@@ -110,6 +110,18 @@ async def listen(request: web.Request, user: db.User) -> web.Response:
     )
 
 
+@routes.get("/rooms", name="rooms")
+@api.require_auth
+async def rooms(request: web.Request, user: db.User) -> web.Response:
+    rooms = await request.app["db"].get_all_rooms()
+    if rooms is None:
+        return aiohttp_jinja2.render_template("notfound.html", request, {})
+
+    return aiohttp_jinja2.render_template(
+        "rooms.html", request, {"is_logged_in": True, "rooms": rooms}
+    )
+
+
 #
 # Stats pages
 #
