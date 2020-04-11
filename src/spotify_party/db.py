@@ -450,6 +450,17 @@ class Database:
             )
             await conn.commit()
 
+    async def get_all_rooms(self) -> Iterable:
+        async with aiosqlite.connect(self.filename) as conn:
+            async with conn.execute(
+                """
+                SELECT DISTINCT
+                    listening_to
+                FROM users;
+                """
+            ) as cursor:
+                return await cursor.fetchall()
+
     async def get_listeners(
         self, room_id: Union[str, None]
     ) -> List[Union[User, None]]:
