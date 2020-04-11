@@ -456,7 +456,9 @@ class Database:
                 """
                 SELECT DISTINCT
                     playing_to
-                FROM users;
+                FROM users
+                WHERE
+                    playing_to IS NOT NULL
                 """
             ) as cursor:
                 return await cursor.fetchall()
