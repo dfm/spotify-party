@@ -455,7 +455,7 @@ class Database:
             async with conn.execute(
                 """
                 SELECT DISTINCT
-                    listening_to
+                    playing_to
                 FROM users;
                 """
             ) as cursor:
