@@ -170,8 +170,11 @@ async def broadcast_start(
 
 
 @routes.post("/broadcast/stop", name="broadcast.stop")
-@require_auth(redirect=False)
-async def broadcast_stop(request: web.Request, user: User) -> web.Response:
+@endpoint(required_data=dict(device_id=str))
+async def broadcast_stop(
+    request: web.Request, user: User, data: Mapping[str, Any]
+) -> web.Response:
+    user.device_id = data["device_id"]
     user.paused = True
     if not await user.pause(request):
         raise web.HTTPNotFound(text="Unable to pause playback")
@@ -256,8 +259,11 @@ async def listen_start(
 
 
 @routes.post("/listen/stop", name="listen.stop")
-@require_auth(redirect=False)
-async def listen_stop(request: web.Request, user: User) -> web.Response:
+@endpoint(required_data=dict(device_id=str))
+async def listen_stop(
+    request: web.Request, user: User, data: Mapping[str, Any]
+) -> web.Response:
+    user.device_id = data["device_id"]
     user.paused = True
     if not await user.pause(request):
         raise web.HTTPNotFound(text="Unable to pause playback")

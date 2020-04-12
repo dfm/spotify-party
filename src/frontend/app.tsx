@@ -55,7 +55,6 @@ class App extends React.Component<AppProps, AppState> {
       if (this.state.status == Status.Streaming) {
         event.preventDefault();
         event.returnValue = "Are you sure?";
-        // this.setState(ReadyState);
         if (this.props.isListener) {
           return "Are you sure you want to stop listening?";
         }
@@ -254,8 +253,8 @@ class App extends React.Component<AppProps, AppState> {
   stopBroadcast() {
     this.setState({ status: Status.Loading });
     this.api.call("/api/broadcast/stop", {
+      data: { device_id: this.state.deviceId },
       callback: () => {
-        // this.socket.emit("leave", this.getRoomId());
         this.setState({ status: Status.Ready });
       },
       error: (message) => {
@@ -328,8 +327,8 @@ class App extends React.Component<AppProps, AppState> {
   stopListening() {
     this.setState({ status: Status.Loading });
     this.api.call("/api/listen/stop", {
+      data: { device_id: this.state.deviceId },
       callback: () => {
-        // this.socket.emit("leave", this.getRoomId());
         this.setState({ status: Status.Ready });
       },
       error: (message) => {
@@ -403,15 +402,6 @@ class App extends React.Component<AppProps, AppState> {
       } else {
         this.startBroadcast();
       }
-    }
-  }
-
-  handleAction2() {
-    if (this.state.status < Status.Streaming) return;
-    if (this.props.isListener) {
-      this.sync();
-    } else {
-      // this.copyLink()
     }
   }
 
