@@ -410,7 +410,7 @@ class App extends React.Component<AppProps, AppState> {
   render() {
     return (
       <div>
-        <small className="channel-label">channel:</small>
+        <small className="channel-label">channel (click to edit):</small>
         {this.props.isListener || this.state.status != Status.Ready ? (
           <div className="room-name">{this.state.roomName}</div>
         ) : (
