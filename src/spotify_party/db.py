@@ -51,23 +51,6 @@ class Database:
             )
             await conn.commit()
 
-    # async def update_auth(self, user: User, auth: SpotifyAuth) -> None:
-    #     async with aiosqlite.connect(self.filename) as conn:
-    #         await conn.execute(
-    #             """UPDATE users SET
-    #                 access_token=?,
-    #                 refresh_token=?,
-    #                 expires_at=?
-    #             WHERE user_id=?""",
-    #             (
-    #                 auth.access_token,
-    #                 auth.refresh_token,
-    #                 auth.expires_at,
-    #                 user.user_id,
-    #             ),
-    #         )
-    #         await conn.commit()
-
     async def add_user(
         self, user_id: str, display_name: str, auth: SpotifyAuth
     ) -> Union[User, None]:
@@ -94,18 +77,6 @@ class Database:
             await conn.commit()
         return await self.get_user(user_id)
 
-    # async def set_device_id(
-    #     self, user_id: Union[str, None], device_id: str
-    # ) -> None:
-    #     if user_id is None:
-    #         return
-    #     async with aiosqlite.connect(self.filename) as conn:
-    #         await conn.execute(
-    #             "UPDATE users SET device_id=? WHERE user_id=?",
-    #             (device_id, user_id),
-    #         )
-    #         await conn.commit()
-
     async def get_user(self, user_id: Union[str, None]) -> Union[User, None]:
         if user_id is None:
             return None
@@ -114,48 +85,6 @@ class Database:
                 "SELECT * FROM users WHERE user_id=?", (user_id,)
             ) as cursor:
                 return User.from_row(self, await cursor.fetchone())
-
-    # async def pause_user(self, user_id: Union[str, None]) -> None:
-    #     if user_id is None:
-    #         return
-    #     async with aiosqlite.connect(self.filename) as conn:
-    #         await conn.execute(
-    #             "UPDATE users SET paused=1 WHERE user_id=?", (user_id,)
-    #         )
-    #         await conn.commit()
-
-    # async def unpause_user(self, user_id: Union[str, None]) -> None:
-    #     if user_id is None:
-    #         return
-    #     async with aiosqlite.connect(self.filename) as conn:
-    #         await conn.execute(
-    #             "UPDATE users SET paused=0 WHERE user_id=?", (user_id,)
-    #         )
-    #         await conn.commit()
-
-    # async def listen_to(
-    #     self, user_id: Union[str, None], room_id: Union[str, None]
-    # ) -> None:
-    #     if user_id is None or room_id is None:
-    #         return
-    #     async with aiosqlite.connect(self.filename) as conn:
-    #         await conn.execute(
-    #             "UPDATE users SET listening_to=?, paused=0 WHERE user_id=?",
-    #             (room_id, user_id),
-    #         )
-    #         await conn.commit()
-
-    # async def stop(self, user_id: Union[str, None]) -> None:
-    #     if user_id is None:
-    #         return
-    #     async with aiosqlite.connect(self.filename) as conn:
-    #         await conn.execute(
-    #             """UPDATE users SET
-    #               listening_to=NULL, playing_to=NULL
-    #             WHERE user_id=?""",
-    #             (user_id,),
-    #         )
-    #         await conn.commit()
 
     async def get_room(self, room_id: Union[str, None]) -> Union[Room, None]:
         if room_id is None:
@@ -175,25 +104,6 @@ class Database:
             await conn.commit()
         return room_id
 
-    # async def pause_room(self, room_id: str) -> None:
-    #     async with aiosqlite.connect(self.filename) as conn:
-    #         await conn.execute(
-    #             "UPDATE users SET paused=1 WHERE playing_to=?", (room_id,)
-    #         )
-    #         await conn.commit()
-
-    # async def close_room(self, room_id: str) -> None:
-    #     async with aiosqlite.connect(self.filename) as conn:
-    #         await conn.execute(
-    #             "UPDATE users SET playing_to=NULL WHERE playing_to=?",
-    #             (room_id,),
-    #         )
-    #         await conn.execute(
-    #             "UPDATE users SET listening_to=NULL WHERE listening_to=?",
-    #             (room_id,),
-    #         )
-    #         await conn.commit()
-
     async def get_all_rooms(self) -> Iterable:
         async with aiosqlite.connect(self.filename) as conn:
             async with conn.execute(
@@ -203,6 +113,7 @@ class Database:
                 FROM users
                 WHERE
                     playing_to IS NOT NULL
+                    AND paused=0
                 """
             ) as cursor:
                 return await cursor.fetchall()

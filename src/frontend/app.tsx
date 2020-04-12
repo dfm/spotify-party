@@ -229,7 +229,9 @@ class App extends React.Component<AppProps, AppState> {
         this.setState({
           status: Status.Streaming,
           streamUrl: response.stream_url,
-          currentTrack: response.playing,
+          currentTrack: response.playing
+            ? response.playing
+            : this.state.currentTrack,
           listeners: response.number,
         });
       },

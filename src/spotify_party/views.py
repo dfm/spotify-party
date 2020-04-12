@@ -111,7 +111,6 @@ async def listen(request: web.Request, user: db.User) -> web.Response:
 @require_auth
 async def rooms(request: web.Request, user: db.User) -> web.Response:
     rooms = await request.config_dict["db"].get_all_rooms()
-    print(rooms)
     if rooms is None:
         return web.HTTPNotFound()
 
