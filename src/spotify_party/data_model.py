@@ -9,6 +9,7 @@ from typing import (
     List,
     Mapping,
     MutableMapping,
+    NamedTuple,
     Optional,
     Union,
 )
@@ -17,11 +18,24 @@ from aiohttp import ClientResponseError, web
 from aiohttp_spotify import SpotifyAuth
 
 from .auth import call_api, update_auth
+from .socket import sio
 
 if TYPE_CHECKING:
     from . import db
 
 DEFAULT_RETRIES = 3
+
+
+class UserData(NamedTuple):
+    user_id: str
+    display_name: str
+    access_token: str
+    refresh_token: str
+    expires_at: int
+    listening_to_id: Optional[str]
+    playing_to_id: Optional[str]
+    paused: bool
+    device_id: Optional[str]
 
 
 class User:
@@ -47,11 +61,82 @@ class User:
         self.paused = bool(paused)
         self.device_id = device_id
 
+        self._context_data: Optional[UserData] = None
+
     async def __aenter__(self) -> None:
-        pass
+        self._context_data = self.data
 
     async def __aexit__(self, exc_type, exc_value, traceback) -> None:
-        await self.update()
+        old_data = self._context_data
+        new_data = self.data
+
+        if old_data is None or new_data is None:
+            raise ValueError("User updated outside a context")
+
+        # The broadcast room changed
+        if new_data.playing_to_id != old_data.playing_to_id:
+            if old_data.playing_to_id is not None:
+                await sio.emit("pause", room=old_data.playing_to_id)
+
+        # The room is the same, but the playing state changed
+        elif (
+            old_data.paused != new_data.paused
+            and new_data.playing_to_id is not None
+        ):
+            if new_data.paused:
+                await sio.emit("pause", room=new_data.playing_to_id)
+            else:
+                await sio.emit("unpause", room=new_data.playing_to_id)
+
+        # The user was previously listening
+        if new_data.listening_to_id != old_data.listening_to_id:
+            await self._send_listeners_to_room(old_data.listening_to_id, -1)
+            await self._send_listeners_to_room(new_data.listening_to_id, 1)
+
+        elif (
+            old_data.paused != new_data.paused
+            and new_data.listening_to_id is not None
+        ):
+            if new_data.paused:
+                await self._send_listeners_to_room(
+                    new_data.listening_to_id, -1
+                )
+            else:
+                await self._send_listeners_to_room(new_data.listening_to_id, 1)
+
+        if self.data != self._context_data:
+            await self.update()
+
+        self._context_data = None
+
+    async def _send_listeners_to_room(
+        self, room_id: Optional[str], delta: int = 0
+    ) -> None:
+        if room_id is None:
+            return
+        listeners = await self.database.get_listeners(room_id)
+        await sio.emit(
+            "listeners",
+            {"number": max(len(listeners) + delta, 0)},
+            room=room_id,
+        )
+
+    @property
+    def data(self):
+        return UserData(
+            self.user_id,
+            self.display_name,
+            self.auth.access_token,
+            self.auth.refresh_token,
+            self.auth.expires_at,
+            self.listening_to_id,
+            self.playing_to_id,
+            self.paused,
+            self.device_id,
+        )
+
+    async def update(self) -> None:
+        await self.database.update(self)
 
     @classmethod
     def from_row(
@@ -69,19 +154,10 @@ class User:
     async def playing_to(self) -> Union["Room", None]:
         return await self.database.get_room(self.playing_to_id)
 
-    async def update(self) -> None:
-        await self.database.update(self)
-
     async def update_auth(self, request: web.Request) -> None:
         changed, auth = await update_auth(request, self.auth)
-        self.auth = auth
-        # if changed:
-        #     await self.database.update_auth(self, auth)
-        #     self.auth = auth
-
-    async def set_device_id(self, device_id: str) -> None:
-        # await self.database.set_device_id(self.user_id, device_id)
-        self.device_id = device_id
+        if changed:
+            self.auth = auth
 
     async def transfer(
         self, request: web.Request, *, play: bool = False, check: bool = True
@@ -127,18 +203,6 @@ class User:
             return False
 
         return True
-
-    async def stop(self, request: web.Request) -> bool:
-        """Like pause, but update the database too"""
-        room = await self.playing_to
-        if room is None:
-            flag = await self.pause(request)
-        else:
-            flag = await room.stop(request)
-
-        # await self.database.stop(self.user_id)
-
-        return flag
 
     async def play(
         self,
@@ -194,7 +258,7 @@ class User:
 
     async def sync(
         self, request: web.Request, *, retries: int = DEFAULT_RETRIES
-    ) -> Union[Mapping[str, Any], None]:
+    ) -> Union[Dict[str, Any], None]:
         room = await self.listening_to
         if room is None:
             return None
@@ -216,46 +280,8 @@ class User:
         else:
             await self.pause(request, retries=retries)
 
-        return data
-
-    async def listen_to(
-        self,
-        request: web.Request,
-        room: "Room",
-        device_id: str,
-        *,
-        retries: int = DEFAULT_RETRIES,
-    ) -> Union[Mapping[str, Any], None]:
-        await self.set_device_id(device_id)
-
-        await self.stop(request)
-
-        # await self.database.listen_to(self.user_id, room.room_id)
-        self.listening_to_id = room.room_id
-        self.paused = False
-
-        return await self.sync(request, retries=retries)
-
-    async def play_to(
-        self, request: web.Request, device_id: str, *, room_name: str
-    ) -> Optional[str]:
-        await self.set_device_id(device_id)
-
-        await self.stop(request)
-
-        # await self.transfer(request)
-        flag = await self.play(request, {})
-        if not flag:
-            return None
-
-        room_id = f"{self.user_id}/{room_name}"
-        # await self.database.add_room(self, room_id)
-
-        self.listening_to_id = None
-        self.playing_to_id = room_id
-        self.paused = False
-
-        return room_id
+        listeners = await room.listeners
+        return dict(number=len(listeners), playing=data)
 
 
 class Room:
@@ -293,19 +319,9 @@ class Room:
         return success
 
     async def pause(self, request: web.Request) -> bool:
-        success = True
+        flag = True
         for user in await self.listeners:
             if user is None or user.paused:
                 continue
-            flag = await user.pause(request)
-            if not flag:
-                success = False
-        return success
-
-    async def stop(self, request: web.Request) -> bool:
-        if self.room_id is None:
-            return False
-        success = await self.host.pause(request)
-        success = success and await self.pause(request)
-        await self.host.database.close_room(self.room_id)
-        return success
+            flag &= await user.pause(request)
+        return flag

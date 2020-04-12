@@ -7,11 +7,11 @@ import { Status, TrackInfo, Error } from "./types";
 import { NowPlaying } from "./components/now-playing";
 import {
   ListenerButtons,
-  BroadcasterButtons
+  BroadcasterButtons,
 } from "./components/player-buttons";
 import {
   ListenerStatusText,
-  BroadcasterStatusText
+  BroadcasterStatusText,
 } from "./components/status-text";
 import { ErrorMessage } from "./components/error-message";
 
@@ -32,12 +32,6 @@ interface AppState {
   error?: Error;
 }
 
-const ReadyState = {
-  status: Status.Ready,
-  isPaused: true,
-  listeners: 0
-};
-
 class App extends React.Component<AppProps, AppState> {
   socket: SocketIOClient.Socket;
   player: Spotify.SpotifyPlayer;
@@ -49,7 +43,7 @@ class App extends React.Component<AppProps, AppState> {
       status: Status.Loading,
       isPaused: true,
       roomName: this.props.initialRoomName,
-      listeners: 0
+      listeners: 0,
     };
 
     this.api = new API();
@@ -57,18 +51,18 @@ class App extends React.Component<AppProps, AppState> {
     this.connectPlayer();
 
     // Handle window closes gracefully
-    window.addEventListener("beforeunload", event => {
+    window.addEventListener("beforeunload", (event) => {
       if (this.state.status == Status.Streaming) {
         event.preventDefault();
         event.returnValue = "Are you sure?";
-        navigator.sendBeacon("/stop");
-        this.setState(ReadyState);
+        // this.setState(ReadyState);
         if (this.props.isListener) {
           return "Are you sure you want to stop listening?";
         }
         return "Are you sure you want to stop broadcasting?";
       }
     });
+    window.addEventListener("unload", () => navigator.sendBeacon("/api/stop"));
   }
 
   connectSocket() {
@@ -77,14 +71,20 @@ class App extends React.Component<AppProps, AppState> {
       this.setState({ listeners: data.number });
     });
     this.socket.on("changed", (data: any) => {
+      if (
+        this.state.status == Status.Ready ||
+        this.state.status == Status.Loading
+      )
+        return;
       this.setState({
+        status: Status.Streaming,
         listeners: data.number,
-        currentTrack: data.playing
+        currentTrack: data.playing,
+        isPaused: false,
       });
     });
-    this.socket.on("close", () => {
-      this.setState(ReadyState);
-    });
+    this.socket.on("pause", () => this.setState({ isPaused: true }));
+    this.socket.on("unpause", () => this.setState({ isPaused: false }));
   }
 
   connectPlayer() {
@@ -93,8 +93,10 @@ class App extends React.Component<AppProps, AppState> {
       name: "distance.dfm.io",
       volume: 1,
       getOAuthToken: (callback: (token: string) => void) => {
-        this.api.call("/api/token", { callback: data => callback(data.token) });
-      }
+        this.api.call("/api/token", {
+          callback: (data) => callback(data.token),
+        });
+      },
     });
 
     this.player.addListener("ready", ({ device_id }) => {
@@ -106,7 +108,7 @@ class App extends React.Component<AppProps, AppState> {
       console.log(`Device has gone offline ${device_id}`);
     });
 
-    this.player.addListener("player_state_changed", state =>
+    this.player.addListener("player_state_changed", (state) =>
       this.handleChange(state)
     );
 
@@ -119,8 +121,8 @@ class App extends React.Component<AppProps, AppState> {
             "The Spotify player couldn't be initialized. " +
             "Try refreshing or using a different browser. " +
             "Note: this page is known to not work in Safari.",
-          handler: () => location.reload()
-        }
+          handler: () => location.reload(),
+        },
       });
     });
     this.player.addListener("authentication_error", ({ message }) => {
@@ -129,8 +131,8 @@ class App extends React.Component<AppProps, AppState> {
         status: Status.Error,
         error: {
           message: "There has been an issue with Spotify credentials.",
-          handler: () => location.reload()
-        }
+          handler: () => location.reload(),
+        },
       });
     });
     this.player.addListener("account_error", ({ message }) => {
@@ -140,8 +142,8 @@ class App extends React.Component<AppProps, AppState> {
         error: {
           message:
             "This page does not work for users without a Spotify Premium account. " +
-            "This is a limitation of the Spotify API and we are very sorry!"
-        }
+            "This is a limitation of the Spotify API and we are very sorry!",
+        },
       });
     });
     this.player.addListener("playback_error", ({ message }) => {
@@ -150,8 +152,8 @@ class App extends React.Component<AppProps, AppState> {
         status: Status.Error,
         error: {
           message: "Something went wrong with playback.",
-          handler: this.props.isListener ? () => this.sync() : null
-        }
+          handler: this.props.isListener ? () => this.sync() : null,
+        },
       });
     });
 
@@ -170,8 +172,8 @@ class App extends React.Component<AppProps, AppState> {
           status: Status.Error,
           error: {
             message: "Your Spotify account got disconnected from this device.",
-            handler: () => this.transfer()
-          }
+            handler: () => this.transfer(),
+          },
         });
       }
       return;
@@ -183,7 +185,7 @@ class App extends React.Component<AppProps, AppState> {
       uri: track.uri,
       type: track.type,
       name: track.name,
-      id: track.id
+      id: track.id,
     };
 
     // Work out if this is a change
@@ -208,13 +210,13 @@ class App extends React.Component<AppProps, AppState> {
   }
 
   startBroadcast() {
-    if (this.state.status < Status.Ready || !this.state.deviceId) {
+    if (this.state.status == Status.Loading || !this.state.deviceId) {
       this.setState({
         status: Status.Error,
         error: {
           message: "Device is not ready.",
-          handler: () => location.reload()
-        }
+          handler: () => location.reload(),
+        },
       });
       return;
     }
@@ -222,23 +224,24 @@ class App extends React.Component<AppProps, AppState> {
     this.setState({ status: Status.Loading });
     this.api.call("/api/broadcast/start", {
       data: { device_id: this.state.deviceId, room_name: this.state.roomName },
-      callback: response => {
+      callback: (response) => {
         this.socket.emit("join", response.room_id);
         this.setState({
           status: Status.Streaming,
           streamUrl: response.stream_url,
-          currentTrack: response.playing
+          currentTrack: response.playing,
+          listeners: response.number,
         });
       },
-      error: message => {
+      error: (message) => {
         this.setState({
           status: Status.Error,
           error: {
             message: `Failed to start broadcast with message: ${message}.`,
-            handler: () => this.startBroadcast()
-          }
+            handler: () => this.startBroadcast(),
+          },
         });
-      }
+      },
     });
   }
 
@@ -250,18 +253,18 @@ class App extends React.Component<AppProps, AppState> {
     this.setState({ status: Status.Loading });
     this.api.call("/api/broadcast/stop", {
       callback: () => {
-        this.socket.emit("leave", this.getRoomId());
-        this.setState(ReadyState);
+        // this.socket.emit("leave", this.getRoomId());
+        this.setState({ status: Status.Ready });
       },
-      error: message => {
+      error: (message) => {
         this.setState({
           status: Status.Error,
           error: {
             message: `Failed to stop broadcast with message: ${message}.`,
-            handler: () => this.stopBroadcast()
-          }
+            handler: () => this.stopBroadcast(),
+          },
         });
-      }
+      },
     });
   }
 
@@ -269,26 +272,26 @@ class App extends React.Component<AppProps, AppState> {
     const track = data;
     this.api.call("/api/broadcast/change", {
       data: track,
-      error: message => {
+      error: (message) => {
         this.setState({
           status: Status.Error,
           error: {
             message: `Failed to change the track with message: '${message}'.`,
-            handler: () => this.changeTrack(track)
-          }
+            handler: () => this.changeTrack(track),
+          },
         });
-      }
+      },
     });
   }
 
   startListening() {
-    if (this.state.status < Status.Ready || !this.state.deviceId) {
+    if (this.state.status == Status.Loading || !this.state.deviceId) {
       this.setState({
         status: Status.Error,
         error: {
           message: "Device is not ready.",
-          handler: () => location.reload()
-        }
+          handler: () => location.reload(),
+        },
       });
       return;
     }
@@ -297,25 +300,26 @@ class App extends React.Component<AppProps, AppState> {
     this.api.call("/api/listen/start", {
       data: {
         device_id: this.state.deviceId,
-        room_id: this.getRoomId()
+        room_id: this.getRoomId(),
       },
-      callback: response => {
+      callback: (response) => {
         this.socket.emit("join", this.getRoomId());
         this.setState({
           status: Status.Streaming,
           listeners: response.number,
-          currentTrack: response.playing
+          currentTrack: response.playing,
+          isPaused: false,
         });
       },
-      error: message => {
+      error: (message) => {
         this.setState({
           status: Status.Error,
           error: {
             message: `Failed to start listening with message: ${message}.`,
-            handler: () => this.startListening()
-          }
+            handler: () => this.startListening(),
+          },
         });
-      }
+      },
     });
   }
 
@@ -323,18 +327,18 @@ class App extends React.Component<AppProps, AppState> {
     this.setState({ status: Status.Loading });
     this.api.call("/api/listen/stop", {
       callback: () => {
-        this.socket.emit("leave", this.getRoomId());
-        this.setState(ReadyState);
+        // this.socket.emit("leave", this.getRoomId());
+        this.setState({ status: Status.Ready });
       },
-      error: message => {
+      error: (message) => {
         this.setState({
           status: Status.Error,
           error: {
             message: `Failed to stop listening with message: ${message}.`,
-            handler: () => this.stopListening()
-          }
+            handler: () => this.stopListening(),
+          },
         });
-      }
+      },
     });
   }
 
@@ -342,21 +346,22 @@ class App extends React.Component<AppProps, AppState> {
     this.setState({ status: Status.Loading });
     this.api.call("/api/listen/sync", {
       data: { device_id: this.state.deviceId },
-      callback: response => {
+      callback: (response) => {
         this.setState({
           status: Status.Streaming,
-          currentTrack: response
+          listeners: response.number,
+          currentTrack: response.playing,
         });
       },
-      error: message => {
+      error: (message) => {
         this.setState({
           status: Status.Error,
           error: {
             message: `Failed to sync playback with message: ${message}.`,
-            handler: () => this.sync()
-          }
+            handler: () => this.sync(),
+          },
         });
-      }
+      },
     });
   }
 
@@ -364,21 +369,21 @@ class App extends React.Component<AppProps, AppState> {
     this.setState({ status: Status.Loading });
     this.api.call("/api/transfer", {
       data: { device_id: this.state.deviceId },
-      callback: response => {
+      callback: (response) => {
         this.setState({
           status: Status.Ready,
-          currentTrack: response.playing
+          currentTrack: response.playing,
         });
       },
-      error: message => {
+      error: (message) => {
         this.setState({
           status: Status.Error,
           error: {
             message: `Failed to transfer playback with message: ${message}.`,
-            handler: () => this.transfer()
-          }
+            handler: () => this.transfer(),
+          },
         });
-      }
+      },
     });
   }
 
@@ -419,14 +424,18 @@ class App extends React.Component<AppProps, AppState> {
             type="text"
             className="room-name"
             value={this.state.roomName}
-            onChange={event =>
+            onChange={(event) =>
               this.setState({
-                roomName: event.target.value.replace(/[\s;,\/\?:@&=\+\$]/g, "-")
+                roomName: event.target.value.replace(
+                  /[\s;,\/\?:@&=\+\$]/g,
+                  "-"
+                ),
               })
             }
           />
         )}
         <NowPlaying
+          isPaused={this.state.isPaused}
           listeners={this.state.listeners}
           trackInfo={this.state.currentTrack}
         />

@@ -12,7 +12,7 @@ import pkg_resources
 from aiohttp import ClientSession, web
 from aiohttp_session.cookie_storage import EncryptedCookieStorage
 
-from . import api, auth, db, views
+from . import api, auth, db, jinja2_helpers, views
 
 
 def get_resource_path(path: str) -> pathlib.Path:
@@ -55,9 +55,10 @@ def app_factory(config: Mapping[str, Any]) -> web.Application:
     )
 
     # Set up the templating engine and the static endpoint
-    aiohttp_jinja2.setup(
+    env = aiohttp_jinja2.setup(
         app, loader=jinja2.FileSystemLoader(get_resource_path("templates"))
     )
+    env.globals.update(jinja2_helpers.GLOBALS)
     app["static_root_url"] = "/assets"
     app.router.add_static("/assets", get_resource_path("assets"))
 

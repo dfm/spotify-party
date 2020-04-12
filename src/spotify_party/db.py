@@ -214,7 +214,8 @@ class Database:
             return []
         async with aiosqlite.connect(self.filename) as conn:
             async with conn.execute(
-                "SELECT * FROM users WHERE listening_to=?", (room_id,)
+                "SELECT * FROM users WHERE listening_to=? AND paused=0",
+                (room_id,),
             ) as cursor:
                 return [User.from_row(self, row) async for row in cursor]
 

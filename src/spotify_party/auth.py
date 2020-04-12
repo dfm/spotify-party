@@ -2,27 +2,19 @@ __all__ = ["require_auth", "handle_auth", "update_auth", "call_api"]
 
 import time
 from functools import partial, wraps
-from typing import (
-    TYPE_CHECKING,
-    Any,
-    Awaitable,
-    Callable,
-    Optional,
-    Tuple,
-    Union,
-)
+from typing import TYPE_CHECKING, Any, Awaitable, Callable, Optional, Tuple
 
 import aiohttp_session
 from aiohttp import web
 from aiohttp_spotify import SpotifyAuth, SpotifyResponse
 
 if TYPE_CHECKING:
-    from . import db  # NOQA
+    from .data_model import User  # NOQA
 
 
 def require_auth(
     original_handler: Optional[
-        Callable[[web.Request, "db.User"], Awaitable]
+        Callable[[web.Request, "User"], Awaitable]
     ] = None,
     *,
     redirect: bool = True,
@@ -41,7 +33,7 @@ def require_auth(
 
 
 def _require_auth(
-    handler: Callable[[web.Request, "db.User"], Awaitable],
+    handler: Callable[[web.Request, "User"], Awaitable],
     *,
     redirect: bool = True,
     admin: bool = False,
@@ -68,8 +60,9 @@ def _require_auth(
         if admin and user.user_id not in request.app["config"]["admins"]:
             return web.HTTPNotFound()
 
-        await user.update_auth(request)
-        return await handler(request, user)
+        async with user:
+            await user.update_auth(request)
+            return await handler(request, user)
 
     return wrapped
 
@@ -111,23 +104,23 @@ async def update_auth(
 
 async def call_api(
     request: web.Request,
-    user: Union["db.User", None],
+    user: Optional["User"],
     endpoint: str,
     *,
     method: str = "GET",
     **kwargs,
-) -> Union[SpotifyResponse, None]:
+) -> Optional[SpotifyResponse]:
     """Call the Spotify API
 
     Args:
         request (web.Request): The current request
-        user (Union[db.User, None]): The current user (this call will fail
+        user (Optional[User]): The current user (this call will fail
             without one)
         endpoint (str): The API path
         method (str, optional): The HTTP request method. Defaults to "GET".
 
     Returns:
-        Union[SpotifyResponse, None]: The response from the API
+        Optional[SpotifyResponse]: The response from the API
 
     """
     if user is None:

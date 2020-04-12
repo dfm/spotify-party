@@ -6,7 +6,7 @@ import aiohttp_jinja2
 import aiohttp_session
 from aiohttp import web
 
-from . import api, db
+from . import db
 from .auth import require_auth
 from .generate_room_name import generate_room_name
 
@@ -62,15 +62,12 @@ async def logout(request: web.Request) -> web.Response:
 async def play(request: web.Request, user: db.User) -> web.Response:
     # We'll reuse the same room id if the user is already playing
     room_id = user.playing_to_id
-
-    # Stop the user's current playback
-    await user.stop(request)
+    user.listening_to_id = None
 
     # Generate a new room name or close the old one
     if room_id is None:
         room_name = generate_room_name()
     else:
-        await api.sio.emit("close", room=room_id)
         room_name = room_id.split("/")[1]
 
     return aiohttp_jinja2.render_template(
@@ -92,7 +89,7 @@ async def listen(request: web.Request, user: db.User) -> web.Response:
         f"{request.match_info['user_id']}/{request.match_info['room_name']}"
     )
 
-    room = await request.app["db"].get_room(room_id)
+    room = await request.config_dict["db"].get_room(room_id)
     if room is None:
         return aiohttp_jinja2.render_template("notfound.html", request, {})
 
@@ -110,15 +107,18 @@ async def listen(request: web.Request, user: db.User) -> web.Response:
     )
 
 
-@routes.get("/rooms", name="rooms")
-@api.require_auth
+@routes.get("/listen", name="listen_index")
+@require_auth
 async def rooms(request: web.Request, user: db.User) -> web.Response:
-    rooms = await request.app["db"].get_all_rooms()
+    rooms = await request.config_dict["db"].get_all_rooms()
+    print(rooms)
     if rooms is None:
-        return aiohttp_jinja2.render_template("notfound.html", request, {})
+        return web.HTTPNotFound()
 
     return aiohttp_jinja2.render_template(
-        "rooms.html", request, {"is_logged_in": True, "rooms": rooms}
+        "rooms.html",
+        request,
+        {"is_logged_in": True, "rooms": rooms, "current_page": "listen"},
     )
 
 
@@ -130,7 +130,7 @@ async def rooms(request: web.Request, user: db.User) -> web.Response:
 @routes.get("/admin", name="admin")
 @require_auth(admin=True)
 async def admin(request: web.Request, user: db.User) -> web.Response:
-    stats = await request.app["db"].get_room_stats()
+    stats = await request.config_dict["db"].get_room_stats()
     return aiohttp_jinja2.render_template(
         "admin.html", request, {"stats": stats}
     )
@@ -142,7 +142,7 @@ async def admin_room(request: web.Request, user: db.User) -> web.Response:
     room_id = (
         f"{request.match_info['user_id']}/{request.match_info['room_name']}"
     )
-    room = await request.app["db"].get_room(room_id)
+    room = await request.config_dict["db"].get_room(room_id)
     if room is None:
         return web.HTTPNotFound()
     return aiohttp_jinja2.render_template(
@@ -162,14 +162,10 @@ async def error_middleware(
     request: web.Request, handler: Callable[[web.Request], Awaitable]
 ) -> web.Response:
     try:
-        response = await handler(request)
-        if response.status < 400:
-            return response
-        error_code = response.status
+        return await handler(request)
     except web.HTTPException as ex:
-        error_code = ex.status
-        if error_code < 400:
+        if ex.status != 404:
             raise
     return aiohttp_jinja2.render_template(
-        "error.html", request, {"error_code": error_code}
+        "error.html", request, {"error_code": 404}
     )

@@ -1,6 +1,9 @@
 __all__ = ["api_app"]
 
-from typing import Any, Dict
+import json
+import traceback
+from functools import partial, wraps
+from typing import Any, Awaitable, Callable, Dict, Mapping, Optional
 
 import yarl
 from aiohttp import web
@@ -12,13 +15,74 @@ from .socket import sio
 routes = web.RouteTableDef()
 
 
+def endpoint(
+    handler: Optional[
+        Callable[[web.Request, User, Mapping[str, Any]], Awaitable]
+    ] = None,
+    *,
+    required_data: Mapping[str, Callable] = {},
+    optional_data: Mapping[str, Callable] = {},
+):
+    if handler is None:
+        return partial(
+            _endpoint, required_data=required_data, optional_data=optional_data
+        )
+    return _endpoint(
+        handler, required_data=required_data, optional_data=optional_data
+    )
+
+
+def _endpoint(
+    handler: Callable[[web.Request, User, Mapping[str, Any]], Awaitable],
+    *,
+    required_data: Mapping[str, Callable] = {},
+    optional_data: Mapping[str, Callable] = {},
+) -> Callable[[web.Request], Awaitable]:
+    @require_auth(redirect=False)
+    @wraps(handler)
+    async def wrapped(request: web.Request, user: User) -> web.Response:
+        try:
+            original_data = await request.json()
+        except json.decoder.JSONDecodeError:
+            original_data = {}
+        data: Dict[str, Any] = dict()
+
+        # Make sure that the required data was included
+        for key, mapper in required_data.items():
+            if key not in original_data:
+                raise web.HTTPBadRequest(
+                    text=f"Missing required field: '{key}'"
+                )
+            try:
+                data[key] = mapper(original_data.pop(key))
+            except TypeError:
+                raise web.HTTPBadRequest(
+                    text=f"Invalid type for field: '{key}'"
+                )
+
+        # Map the rest of the data
+        for key, value in original_data.items():
+            if key not in optional_data:
+                raise web.HTTPBadRequest(text=f"Invalid field: '{key}'")
+            try:
+                data[key] = optional_data[key](value)
+            except TypeError:
+                raise web.HTTPBadRequest(
+                    text=f"Invalid type for field: '{key}'"
+                )
+
+        return await handler(request, user, data)
+
+    return wrapped
+
+
 #
 # Endpoints
 #
 
 
 @routes.route("*", "/me", name="interface.me")
-@require_auth(redirect=False)
+@require_auth
 async def me(request: web.Request, user: User) -> web.Response:
     return web.json_response(
         dict(user_id=user.user_id, display_name=user.display_name)
@@ -32,16 +96,11 @@ async def token(request: web.Request, user: User) -> web.Response:
 
 
 @routes.post("/transfer", name="interface.transfer")
-@require_auth(redirect=False)
-async def transfer(request: web.Request, user: User) -> web.Response:
-    data = await request.json()
-
-    # A device ID is required
-    device_id = data.get("device_id", None)
-    if device_id is None:
-        return web.json_response({"error": "Missing device_id"})
-
-    await user.set_device_id(device_id)
+@endpoint(required_data=dict(device_id=str))
+async def transfer(
+    request: web.Request, user: User, data: Mapping[str, Any]
+) -> web.Response:
+    user.device_id = data["device_id"]
     if not await user.transfer(request, play=True, check=True):
         return web.json_response({"error": "Unable to transfer"})
 
@@ -51,24 +110,9 @@ async def transfer(request: web.Request, user: User) -> web.Response:
 
 
 @routes.route("*", "/stop", name="stop")
-@require_auth(redirect=False)
+@require_auth
 async def stop(request: web.Request, user: User) -> web.Response:
-    playing_to = await user.playing_to
-    if playing_to is not None:
-        await playing_to.pause(request)
-        await request.config_dict["db"].close_room(playing_to.room_id)
-        await sio.emit("close", room=playing_to.room_id)
-        return web.Response(body="stopped")
-
-    listening_to = await user.listening_to
-    if listening_to is not None:
-        await user.stop(request)
-        await sio.emit(
-            "listeners",
-            {"number": len(await listening_to.listeners)},
-            room=listening_to.room_id,
-        )
-
+    user.paused = True
     return web.Response(body="stopped")
 
 
@@ -78,31 +122,49 @@ async def stop(request: web.Request, user: User) -> web.Response:
 
 
 @routes.post("/broadcast/start", name="broadcast.start")
-@require_auth(redirect=False)
-async def broadcast_start(request: web.Request, user: User) -> web.Response:
-    data = await request.json()
+@endpoint(required_data=dict(device_id=str, room_name=str))
+async def broadcast_start(
+    request: web.Request, user: User, data: Mapping[str, Any]
+) -> web.Response:
+    user.device_id = data["device_id"]
+    room_name = data["room_name"]
 
-    # A device ID is required
-    device_id = data.get("device_id", None)
-    if device_id is None:
-        return web.json_response({"error": "Missing device_id"})
+    # Start the playback on the correct device
+    if not await user.play(request, {}):
+        raise web.HTTPNotFound(text="Unable to start playback")
 
-    room_name = data.get("room_name", None)
-    if room_name is None:
-        return web.json_response({"error": "Missing room_name"})
+    # Update the properties of this user
+    user.paused = False
+    user.listening_to_id = None
+    room_id = user.playing_to_id = f"{user.user_id}/{room_name}"
 
-    room_id = await user.play_to(request, device_id, room_name=room_name)
-    if room_id is None:
-        return web.json_response({"error": "Unable to transfer device"})
-
+    # Construct the stream URL
     url = yarl.URL(request.config_dict["config"]["base_url"]).with_path(
         f"/listen/{room_id}"
     )
-    response: Dict[str, Any] = {"room_id": room_id, "stream_url": str(url)}
+    response: Dict[str, Any] = {
+        "room_id": room_id,
+        "stream_url": str(url),
+        "playing": None,
+        "number": 0,
+    }
 
+    # Get the currently playing track
     current = await user.currently_playing(request)
     if current is not None:
         response["playing"] = current
+
+        # Start playback for listeners
+        room = await user.playing_to
+        if room is not None:
+            await room.play(
+                request, current["uri"], current.get("position_ms", None)
+            )
+
+            response["number"] = len(await room.listeners)
+
+        # Update the info for the listeners
+        await sio.emit("changed", response, room=room_id)
 
     return web.json_response(response)
 
@@ -110,45 +172,44 @@ async def broadcast_start(request: web.Request, user: User) -> web.Response:
 @routes.post("/broadcast/stop", name="broadcast.stop")
 @require_auth(redirect=False)
 async def broadcast_stop(request: web.Request, user: User) -> web.Response:
-    room = await user.playing_to
-
-    if not await user.stop(request):
-        return web.json_response({"error": "Unable to stop playing"})
-
-    if room is not None:
-        await sio.emit("close", room=room.room_id)
-
+    user.paused = True
+    if not await user.pause(request):
+        raise web.HTTPNotFound(text="Unable to pause playback")
     return web.json_response({})
 
 
 @routes.post("/broadcast/pause", name="broadcast.pause")
 @require_auth(redirect=False)
 async def broadcast_pause(request: web.Request, user: User) -> web.Response:
-    room = await user.playing_to
-    if room is None:
-        return web.json_response({"error": "User is not playing"})
+    user.paused = True
 
-    if not await room.pause(request):
-        return web.json_response({"error": "Unable to pause room"})
+    # Here we're pausing the playback of the listeners
+    # We're not going to bother checking for success because the host doesn't
+    # care too much if we can't pause all the user playback.
+    room = await user.playing_to
+    if room:
+        await room.pause(request)
 
     return web.json_response({})
 
 
 @routes.post("/broadcast/change", name="broadcast.change")
-@require_auth(redirect=False)
-async def broadcast_change(request: web.Request, user: User) -> web.Response:
-    data = await request.json()
-
-    uri = data.get("uri", None)
-    if uri is None:
-        return web.json_response({"error": "Missing uri"})
+@endpoint(
+    required_data=dict(uri=str, name=str, type=str, id=str),
+    optional_data=dict(position_ms=int),
+)
+async def broadcast_change(
+    request: web.Request, user: User, data: Mapping[str, Any]
+) -> web.Response:
 
     room = await user.playing_to
     if room is None:
-        return web.json_response({"error": "User not playing"})
+        raise web.HTTPUnauthorized(text="This user is not currently playing")
 
-    if not await room.play(request, uri, data.get("position_ms", None)):
-        return web.json_response({"error": "Unable to change song"})
+    if not await room.play(
+        request, data["uri"], data.get("position_ms", None)
+    ):
+        raise web.HTTPNotFound(text="Unable to change song")
 
     await sio.emit(
         "changed",
@@ -165,69 +226,79 @@ async def broadcast_change(request: web.Request, user: User) -> web.Response:
 
 
 @routes.post("/listen/start", name="listen.start")
-@require_auth(redirect=False)
-async def listen_start(request: web.Request, user: User) -> web.Response:
-    data = await request.json()
-
-    # A device ID is required
-    device_id = data.get("device_id", None)
-    if device_id is None:
-        return web.json_response({"error": "Missing device_id"})
+@endpoint(required_data=dict(device_id=str, room_id=str))
+async def listen_start(
+    request: web.Request, user: User, data: Mapping[str, Any]
+) -> web.Response:
+    user.device_id = data["device_id"]
+    room_id = data["room_id"]
 
     # Make sure that the room exists
-    room = await request.config_dict["db"].get_room(data.get("room_id", None))
+    room = await request.config_dict["db"].get_room(room_id)
     if room is None:
-        return web.json_response({"error": "Invalid room_id"})
+        raise web.HTTPBadRequest(text="Invalid room_id")
 
-    data = await user.listen_to(request, room, device_id=device_id)
-    if data is None:
-        return web.json_response({"error": "Unable to start listening"})
+    # Update the user state
+    user.paused = False
+    user.listening_to_id = room_id
+    user.playing_to_id = None
 
-    data = {"playing": data, "number": len(await room.listeners)}
-    await sio.emit("listeners", {"number": data["number"]}, room=room.room_id)
+    # Sync the playback
+    response = await user.sync(request)
+    if not response:
+        raise web.HTTPNotFound(text="The broadcast is paused")
+
+    # Increment the number of listeners
+    response["number"] += 1
 
     # It worked!
-    return web.json_response(data)
+    return web.json_response(response)
 
 
 @routes.post("/listen/stop", name="listen.stop")
 @require_auth(redirect=False)
 async def listen_stop(request: web.Request, user: User) -> web.Response:
-    if user.playing_to_id is not None or user.listening_to_id is None:
-        return web.json_response({})
-
-    room = await user.listening_to
-    await user.stop(request)
-
-    if room is not None:
-        await sio.emit(
-            "listeners",
-            {"number": len(await room.listeners)},
-            room=room.room_id,
-        )
-
+    user.paused = True
+    if not await user.pause(request):
+        raise web.HTTPNotFound(text="Unable to pause playback")
     return web.json_response({})
 
 
 @routes.post("/listen/sync", name="listen.sync")
-@require_auth(redirect=False)
-async def listen_sync(request: web.Request, user: User) -> web.Response:
-    data = await request.json()
+@endpoint(required_data=dict(device_id=str))
+async def listen_sync(
+    request: web.Request, user: User, data: Mapping[str, Any]
+) -> web.Response:
+    user.device_id = data["device_id"]
 
-    # A device ID is required
-    device_id = data.get("device_id", None)
-    if device_id is None:
-        return web.json_response({"error": "Missing device_id"})
+    response = await user.sync(request)
+    if response is None:
+        raise web.HTTPNotFound(text="The broadcast is paused")
 
-    await user.set_device_id(device_id)
-    data = await user.sync(request)
-    if data is None:
-        return web.json_response({"error": "Unable to sync playback"})
+    return web.json_response(response)
 
-    return web.json_response(data)
+
+#
+# App setup
+#
+
+
+@web.middleware
+async def error_middleware(
+    request: web.Request, handler: Callable[[web.Request], Awaitable]
+) -> web.Response:
+    try:
+        return await handler(request)
+    except web.HTTPException as ex:
+        return web.json_response({"error": ex.text}, status=ex.status)
+    except Exception:
+        traceback.print_exc()
+        return web.json_response(
+            {"error": "Something went horribly wrong"}, status=500
+        )
 
 
 def api_app() -> web.Application:
-    app = web.Application()
+    app = web.Application(middlewares=[error_middleware])
     app.add_routes(routes)
     return app

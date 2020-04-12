@@ -56,6 +56,11 @@
               href="{{ url('play') }}"
               >Broadcast</a
             >
+            <a
+              class="nav-link{% if current_page == 'listen' %} active {% endif %}"
+              href="{{ url('listen_index') }}"
+              >Listen</a
+            >
             {% if is_logged_in %}
             <a class="nav-link" href="{{ url('logout') }}">Log out</a>
             {% endif %}
