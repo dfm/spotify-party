@@ -142,7 +142,9 @@ class Database:
                 FROM users AS main
                 LEFT JOIN users AS other ON
                     main.playing_to = other.listening_to
-                WHERE main.playing_to IS NOT NULL
+                WHERE
+                    main.playing_to IS NOT NULL
+                    AND main.paused=0
                 """
             ) as cursor:
                 return await cursor.fetchall()
