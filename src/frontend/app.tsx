@@ -251,6 +251,7 @@ class App extends React.Component<AppProps, AppState> {
   }
 
   stopBroadcast() {
+    this.player.pause();
     this.setState({ status: Status.Loading });
     this.api.call("/api/broadcast/stop", {
       data: { device_id: this.state.deviceId },
@@ -325,6 +326,7 @@ class App extends React.Component<AppProps, AppState> {
   }
 
   stopListening() {
+    this.player.pause();
     this.setState({ status: Status.Loading });
     this.api.call("/api/listen/stop", {
       data: { device_id: this.state.deviceId },
