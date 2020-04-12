@@ -408,12 +408,14 @@ class App extends React.Component<AppProps, AppState> {
   }
 
   render() {
+    const editable =
+      !this.props.isListener && this.state.status == Status.Ready;
     return (
       <div>
-        <small className="channel-label">channel (click to edit):</small>
-        {this.props.isListener || this.state.status != Status.Ready ? (
-          <div className="room-name">{this.state.roomName}</div>
-        ) : (
+        <small className="channel-label">
+          channel{editable ? " (click to edit)" : ""}:
+        </small>
+        {editable ? (
           <input
             type="text"
             className="room-name"
@@ -427,6 +429,8 @@ class App extends React.Component<AppProps, AppState> {
               })
             }
           />
+        ) : (
+          <div className="room-name">{this.state.roomName}</div>
         )}
         <NowPlaying
           isPaused={this.state.isPaused}
