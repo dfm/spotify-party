@@ -29,7 +29,9 @@ async def client_session(app: web.Application) -> AsyncIterator[None]:
 
 
 def app_factory(config: Mapping[str, Any]) -> web.Application:
-    app = web.Application(middlewares=[views.error_middleware])
+    app = web.Application(
+        middlewares=[views.error_middleware, web.normalize_path_middleware()]
+    )
 
     # load the configuration file
     app["config"] = config

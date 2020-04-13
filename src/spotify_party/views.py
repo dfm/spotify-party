@@ -23,26 +23,26 @@ async def index(request: web.Request) -> web.Response:
     return aiohttp_jinja2.render_template("splash.html", request, {})
 
 
-@routes.get("/about", name="about")
+@routes.get("/about/", name="about")
 async def about(request: web.Request) -> web.Response:
     return aiohttp_jinja2.render_template(
         "about.html", request, {"current_page": "about"}
     )
 
 
-@routes.get("/premium", name="premium")
+@routes.get("/premium/", name="premium")
 async def premium(request: web.Request) -> web.Response:
     return aiohttp_jinja2.render_template("premium.html", request, {})
 
 
-@routes.get("/login", name="login")
+@routes.get("/login/", name="login")
 async def login(request: web.Request) -> web.Response:
     return web.HTTPTemporaryRedirect(
         location=request.app.router["play"].url_for()
     )
 
 
-@routes.get("/logout", name="logout")
+@routes.get("/logout/", name="logout")
 async def logout(request: web.Request) -> web.Response:
     session = await aiohttp_session.get_session(request)
     if "sp_user_id" in session:
@@ -57,7 +57,7 @@ async def logout(request: web.Request) -> web.Response:
 #
 
 
-@routes.get("/play", name="play")
+@routes.get("/play/", name="play")
 @require_auth
 async def play(request: web.Request, user: db.User) -> web.Response:
     # We'll reuse the same room id if the user is already playing
@@ -82,7 +82,7 @@ async def play(request: web.Request, user: db.User) -> web.Response:
     )
 
 
-@routes.get("/listen/{user_id}/{room_name}", name="listen")
+@routes.get("/listen/{user_id}/{room_name}/", name="listen")
 @require_auth
 async def listen(request: web.Request, user: db.User) -> web.Response:
     room_id = (
@@ -107,7 +107,7 @@ async def listen(request: web.Request, user: db.User) -> web.Response:
     )
 
 
-@routes.get("/listen", name="listen_index")
+@routes.get("/listen/", name="listen_index")
 @require_auth
 async def rooms(request: web.Request, user: db.User) -> web.Response:
     rooms = await request.config_dict["db"].get_all_rooms()
@@ -126,7 +126,7 @@ async def rooms(request: web.Request, user: db.User) -> web.Response:
 #
 
 
-@routes.get("/admin", name="admin")
+@routes.get("/admin/", name="admin")
 @require_auth(admin=True)
 async def admin(request: web.Request, user: db.User) -> web.Response:
     stats = await request.config_dict["db"].get_room_stats()
@@ -135,7 +135,7 @@ async def admin(request: web.Request, user: db.User) -> web.Response:
     )
 
 
-@routes.get("/admin/table", name="admin.table")
+@routes.get("/admin/table/", name="admin.table")
 @require_auth(admin=True)
 async def admin_table(request: web.Request, user: db.User) -> web.Response:
     table = await request.config_dict["db"].get_full_table()
@@ -160,7 +160,7 @@ async def admin_table(request: web.Request, user: db.User) -> web.Response:
     )
 
 
-@routes.get("/admin/{user_id}/{room_name}", name="admin.room")
+@routes.get("/admin/{user_id}/{room_name}/", name="admin.room")
 @require_auth(admin=True)
 async def admin_room(request: web.Request, user: db.User) -> web.Response:
     room_id = (
