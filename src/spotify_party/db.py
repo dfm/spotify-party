@@ -148,3 +148,18 @@ class Database:
                 """
             ) as cursor:
                 return await cursor.fetchall()
+
+    async def get_full_table(self) -> Iterable:
+        async with aiosqlite.connect(self.filename) as conn:
+            async with conn.execute(
+                """
+                SELECT
+                    user_id,
+                    display_name,
+                    paused,
+                    playing_to,
+                    listening_to
+                FROM users
+                """
+            ) as cursor:
+                return await cursor.fetchall()

@@ -135,6 +135,31 @@ async def admin(request: web.Request, user: db.User) -> web.Response:
     )
 
 
+@routes.get("/admin/table", name="admin.table")
+@require_auth(admin=True)
+async def admin_table(request: web.Request, user: db.User) -> web.Response:
+    table = await request.config_dict["db"].get_full_table()
+    return web.json_response(
+        {
+            "table": [
+                dict(
+                    zip(
+                        [
+                            "user_id",
+                            "display_name",
+                            "paused",
+                            "playing_to",
+                            "listening_to",
+                        ],
+                        row,
+                    )
+                )
+                for row in table
+            ]
+        }
+    )
+
+
 @routes.get("/admin/{user_id}/{room_name}", name="admin.room")
 @require_auth(admin=True)
 async def admin_room(request: web.Request, user: db.User) -> web.Response:
