@@ -138,6 +138,6 @@ async def call_api(
 
     # Update the authentication info if required
     if response.auth_changed:
-        await request.config_dict["db"].update_auth(user, response.auth)
+        user.auth = response.auth
 
     return response
