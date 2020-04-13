@@ -1,4 +1,5 @@
 import argparse
+import sqlite3
 
 from aiohttp import web
 
@@ -13,7 +14,10 @@ config = get_config(args.config_file)
 
 
 if args.create_tables:
-    create_tables(config["database_filename"])
+    try:
+        create_tables(config["database_filename"])
+    except sqlite3.OperationalError:
+        print("Tables already exist")
 
 else:
     web.run_app(app_factory(config), port=config["port"])
