@@ -209,11 +209,8 @@ async def broadcast_change(
     if room is None:
         raise web.HTTPUnauthorized(text="This user is not currently playing")
 
-    if not await room.play(
-        request, data["uri"], data.get("position_ms", None)
-    ):
-        raise web.HTTPNotFound(text="Unable to change song")
-
+    user.paused = False
+    await room.play(request, data["uri"], data.get("position_ms", None))
     await sio.emit(
         "changed",
         {"number": len(await room.listeners), "playing": data},

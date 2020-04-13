@@ -28,7 +28,13 @@ async def connect(sid: str, environ: Mapping[str, Any]) -> bool:
 
 @sio.event
 async def disconnect(sid: str) -> None:
-    pass
+    request = sio.environ[sid]["aiohttp.request"]
+    session = await aiohttp_session.get_session(request)
+    user = await request.config_dict["db"].get_user(session.get("sp_user_id"))
+    if user is None:
+        return
+    async with user:
+        user.paused = True
 
 
 @sio.event
