@@ -8,42 +8,42 @@ const CopyPlugin = require("copy-webpack-plugin");
 
 module.exports = {
   entry: {
-    splash: "./src/frontend/splash.ts",
-    bundle: "./src/frontend/bundle.ts"
+    auth: "./src/auth.ts",
+    spotify: "./src/spotify.ts",
   },
   optimization: {
-    minimizer: [new TerserJSPlugin({}), new OptimizeCSSAssetsPlugin({})]
+    minimizer: [new TerserJSPlugin({}), new OptimizeCSSAssetsPlugin({})],
   },
   plugins: [
     new MiniCssExtractPlugin(),
     new CleanWebpackPlugin(),
-    new CopyPlugin([{ from: "./src/frontend/img", to: "." }])
+    new CopyPlugin([{ from: "./src/img", to: "." }]),
   ],
   module: {
     rules: [
       {
         test: /\.tsx?$/,
         use: "ts-loader",
-        exclude: /node_modules/
+        exclude: /node_modules/,
       },
       {
         test: /\.css$/i,
-        use: [MiniCssExtractPlugin.loader, "css-loader"]
+        use: [MiniCssExtractPlugin.loader, "css-loader"],
       },
       {
         test: /\.js$/,
         loader: "script-loader",
-        exclude: /node_modules/
-      }
-    ]
+        exclude: /node_modules/,
+      },
+    ],
   },
   resolve: {
-    extensions: [".tsx", ".ts", ".js"]
+    extensions: [".tsx", ".ts", ".js"],
   },
   output: {
     library: "SpotifyPartyApp",
     filename: "[name].js",
-    path: path.resolve(__dirname, "./src/spotify_party/assets"),
-    publicPath: "/assets"
-  }
+    path: path.resolve(__dirname, "./assets"),
+    publicPath: "/assets",
+  },
 };
