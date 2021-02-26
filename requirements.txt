@@ -1,4 +1,4 @@
-aiohttp==3.6.2
+aiohttp==3.7.4
 aiohttp-jinja2==1.2.0
 aiohttp-session==2.9.0
 aiohttp-spotify==0.0.4
